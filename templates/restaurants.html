@@ -1,0 +1,116 @@
+{% extends "layout.html" %}
+
+{% block title %}Restaurantes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Gerenciar Restaurantes</h3>
+    <form class="d-flex" method="GET" action="{{ url_for('list_restaurants') }}" style="max-width: 420px; width: 100%;">
+        <input type="text" name="q" class="form-control me-2" placeholder="Pesquisar por nome, categoria ou endereço" value="{{ q or '' }}">
+        <button class="btn btn-outline-danger" type="submit"><i class="fas fa-search"></i></button>
+    </form>
+</div>
+
+<div class="card modern-card mb-4">
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            {% if current_user.is_authenticated %}
+            {% if current_user.is_restaurant %}
+            <a href="{{ url_for('create_restaurant') }}" class="btn btn-danger">
+                <i class="fas fa-plus"></i> Cadastrar Meu Restaurante
+            </a>
+            {% endif %}
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('register_restaurant') }}" class="btn btn-outline-danger">
+                <i class="fas fa-user-plus"></i> Criar Conta de Restaurante
+            </a>
+            {% endif %}
+            {% endif %}
+            <span class="text-muted">Total: {{ restaurants|length }} restaurantes</span>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive modern-table">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th>Logo</th>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>Taxa</th>
+                <th>Tempo</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for restaurant in restaurants %}
+            <tr>
+                <td style="width: 60px;">
+                    <img src="{{ restaurant.logo or url_for('static', filename='images/restaurant-placeholder.jpg') }}" alt="{{ restaurant.name }}" class="rounded" style="width: 48px; height: 48px; object-fit: cover;">
+                </td>
+                <td>
+                    <strong>{{ restaurant.name }}</strong>
+                    <div class="text-muted small">Avaliação: <i class="fas fa-star text-warning"></i> {{ restaurant.rating|round(1) }}</div>
+                </td>
+                <td>{{ restaurant.category }}</td>
+                <td>{{ restaurant.delivery_fee|round(2) }} R$</td>
+                <td>{{ restaurant.delivery_time }} min</td>
+                <td>
+                    <div class="btn-group">
+                        <a href="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" class="btn btn-outline-secondary btn-sm">Ver</a>
+                        {% if current_user.is_authenticated and (current_user.is_admin or current_user.id == restaurant.owner_id) %}
+                        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ restaurant.id }}">Editar</button>
+                        <form method="POST" action="{{ url_for('delete_restaurant', restaurant_id=restaurant.id) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Tem certeza que deseja deletar este restaurante?')">Excluir</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+
+            {% if current_user.is_authenticated and (current_user.is_admin or current_user.id == restaurant.owner_id) %}
+            <div class="modal fade" id="editModal{{ restaurant.id }}" tabindex="-1" aria-labelledby="editModalLabel{{ restaurant.id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editModalLabel{{ restaurant.id }}">Editar Restaurante</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('edit_restaurant', restaurant_id=restaurant.id) }}">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="name{{ restaurant.id }}" class="form-label">Nome</label>
+                                    <input type="text" class="form-control" id="name{{ restaurant.id }}" name="name" value="{{ restaurant.name }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="category{{ restaurant.id }}" class="form-label">Categoria</label>
+                                    <input type="text" class="form-control" id="category{{ restaurant.id }}" name="category" value="{{ restaurant.category }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="delivery_fee{{ restaurant.id }}" class="form-label">Taxa de Entrega (R$)</label>
+                                    <input type="number" step="0.01" class="form-control" id="delivery_fee{{ restaurant.id }}" name="delivery_fee" value="{{ restaurant.delivery_fee }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="delivery_time{{ restaurant.id }}" class="form-label">Tempo de Entrega (min)</label>
+                                    <input type="number" class="form-control" id="delivery_time{{ restaurant.id }}" name="delivery_time" value="{{ restaurant.delivery_time }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="logo{{ restaurant.id }}" class="form-label">Logo (URL)</label>
+                                    <input type="text" class="form-control" id="logo{{ restaurant.id }}" name="logo" value="{{ restaurant.logo }}">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-danger">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

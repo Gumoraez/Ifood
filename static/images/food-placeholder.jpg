@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#f8f8f8"/>
+  <circle cx="100" cy="85" r="50" fill="#f0f0f0" stroke="#EA1D2C" stroke-width="2"/>
+  <path d="M70,85 C70,68.4 83.4,55 100,55 C116.6,55 130,68.4 130,85 C130,101.6 116.6,115 100,115 C83.4,115 70,101.6 70,85 Z M100,65 C89,65 80,74 80,85 C80,96 89,105 100,105 C111,105 120,96 120,85 C120,74 111,65 100,65 Z" fill="#EA1D2C"/>
+  <path d="M85,130 L115,130 C117,130 119,132 119,134 L119,136 C119,138 117,140 115,140 L85,140 C83,140 81,138 81,136 L81,134 C81,132 83,130 85,130 Z" fill="#EA1D2C"/>
+  <text x="100" y="160" font-family="Arial" font-size="12" fill="#717171" text-anchor="middle">Imagem do Prato</text>
+</svg>

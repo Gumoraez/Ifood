@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}
+{% if restaurant %}Editar Restaurante{% else %}Novo Restaurante{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">{% if restaurant %}Editar Restaurante{% else %}Novo Restaurante{% endif %}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{% if restaurant %}{{ url_for('edit_restaurant', restaurant_id=restaurant.id) }}{% else %}{{ url_for('create_restaurant') }}{% endif %}">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nome do Restaurante</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ restaurant.name if restaurant else '' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Categoria</label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="">Selecione uma categoria</option>
+                                <option value="Brasileira" {% if restaurant and restaurant.category == 'Brasileira' %}selected{% endif %}>Brasileira</option>
+                                <option value="Italiana" {% if restaurant and restaurant.category == 'Italiana' %}selected{% endif %}>Italiana</option>
+                                <option value="Japonesa" {% if restaurant and restaurant.category == 'Japonesa' %}selected{% endif %}>Japonesa</option>
+                                <option value="Fast Food" {% if restaurant and restaurant.category == 'Fast Food' %}selected{% endif %}>Fast Food</option>
+                                <option value="Vegetariana" {% if restaurant and restaurant.category == 'Vegetariana' %}selected{% endif %}>Vegetariana</option>
+                                <option value="Árabe" {% if restaurant and restaurant.category == 'Árabe' %}selected{% endif %}>Árabe</option>
+                                <option value="Chinesa" {% if restaurant and restaurant.category == 'Chinesa' %}selected{% endif %}>Chinesa</option>
+                                <option value="Mexicana" {% if restaurant and restaurant.category == 'Mexicana' %}selected{% endif %}>Mexicana</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required>{{ restaurant.description if restaurant else '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Endereço</label>
+                            <input type="text" class="form-control" id="address" name="address" value="{{ restaurant.address if restaurant else '' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Telefone</label>
+                            <input type="text" class="form-control" id="phone" name="phone" value="{{ restaurant.phone if restaurant else '' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image_url" class="form-label">URL da Imagem</label>
+                            <input type="text" class="form-control" id="image_url" name="image_url" value="{{ restaurant.image_url if restaurant else '' }}">
+                            <div class="form-text">URL da imagem do restaurante (opcional)</div>
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('list_restaurants') }}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-danger">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

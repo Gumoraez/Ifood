@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block title %}Checkout{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-8">
+    <div class="card mb-4">
+      <div class="card-header bg-danger text-white">
+        <h5 class="mb-0">Finalizar Pedido</h5>
+      </div>
+      <div class="card-body">
+        <p>Use a página do carrinho para ajustar itens e finalizar o pedido.</p>
+        <a href="{{ url_for('cart') }}" class="btn btn-danger">
+          <i class="fas fa-shopping-cart"></i> Ir para o Carrinho
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">Endereço de Entrega</h5>
+      </div>
+      <div class="card-body">
+        <p class="mb-0">{{ current_user.address }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

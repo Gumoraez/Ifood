@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+
+{% block title %}Página Inicial{% endblock %}
+
+{% block content %}
+
+<div class="hero-section mb-4">
+    <div class="row align-items-center">
+        <div class="col-lg-7">
+            <h1 class="hero-title mb-2">Peça suas comidas favoritas perto de você</h1>
+            <p class="hero-subtitle mb-4">Explore restaurantes populares, busque por categorias e descubra novos sabores.</p>
+            <form class="d-flex hero-search" method="GET" action="{{ url_for('index') }}">
+                <input type="text" name="q" class="form-control me-2" placeholder="Pesquisar por nome, categoria ou endereço" value="{{ q or '' }}">
+                <button class="btn btn-danger" type="submit"><i class="fas fa-search me-1"></i> Buscar</button>
+            </form>
+        </div>
+        <div class="col-lg-5 d-none d-lg-block"></div>
+    </div>
+</div>
+
+<div class="category-chips mb-4">
+    <a href="#" class="category-chip"><i class="fas fa-hamburger"></i> Lanches</a>
+    <a href="#" class="category-chip"><i class="fas fa-pizza-slice"></i> Pizza</a>
+    <a href="#" class="category-chip"><i class="fas fa-drumstick-bite"></i> Frango</a>
+    <a href="#" class="category-chip"><i class="fas fa-fish"></i> Japonesa</a>
+    <a href="#" class="category-chip"><i class="fas fa-ice-cream"></i> Sobremesas</a>
+    <a href="#" class="category-chip"><i class="fas fa-coffee"></i> Café</a>
+    <a href="#" class="category-chip"><i class="fas fa-utensils"></i> Brasileira</a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <h3>Restaurantes Populares</h3>
+        {% if q %}
+        <span class="text-muted">Filtrando por: "{{ q }}"</span>
+        {% endif %}
+    </div>
+    
+    {% if restaurants %}
+        {% for restaurant in restaurants %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="position-relative">
+                        <img src="{{ restaurant.logo or url_for('static', filename='images/restaurant-placeholder.jpg') }}" class="card-img-top" alt="{{ restaurant.name }}">
+                        <span class="badge badge-rating position-absolute bottom-0 end-0 m-2">
+                            <i class="fas fa-star text-warning"></i> {{ restaurant.rating|round(1) }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ restaurant.name }}</h5>
+                        <p class="card-text text-muted">{{ restaurant.category }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-motorcycle"></i> {{ restaurant.delivery_fee|round(2) }} R$ • 
+                                <i class="far fa-clock"></i> {{ restaurant.delivery_time }} min
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <a href="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" class="btn btn-outline-danger w-100">Ver Cardápio</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                Nenhum restaurante encontrado. Volte mais tarde!
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+{% block title %}Pedidos do Restaurante{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Pedidos - {{ restaurant.name }}</h2>
+        <div>
+            <a href="{{ url_for('restaurants') }}" class="btn btn-secondary">Voltar</a>
+            <a href="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" class="btn btn-info">Ver Restaurante</a>
+        </div>
+    </div>
+
+    {% if orders %}
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Cliente</th>
+                    <th>Itens</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Criado em</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.id }}</td>
+                    <td>{{ order.customer.name }}</td>
+                    <td>
+                        <ul class="mb-0">
+                            {% for item in order.items %}
+                                <li>{{ item.quantity }}x {{ item.menu_item.name }} - R$ {{ '%.2f'|format(item.price) }}</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>R$ {{ '%.2f'|format(order.total) }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('update_order_status', order_id=order.id) }}" class="d-flex gap-2">
+                            <input type="hidden" name="next" value="{{ url_for('restaurant_orders', restaurant_id=restaurant.id) }}">
+                            <select name="status" class="form-select form-select-sm" {% if order.status in ['delivered','cancelled'] %}disabled{% endif %}>
+                                {% for s in statuses %}
+                                    <option value="{{ s }}" {% if order.status == s %}selected{% endif %}>{{ s }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary" {% if order.status in ['delivered','cancelled'] %}disabled{% endif %}>Atualizar</button>
+                        </form>
+                    </td>
+                    <td>{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            {% if order.status == 'pending' %}
+                            <form method="POST" action="{{ url_for('update_order_status', order_id=order.id) }}" onsubmit="return confirm('Cancelar este pedido?');">
+                                <input type="hidden" name="status" value="cancelled">
+                                <input type="hidden" name="next" value="{{ url_for('restaurant_orders', restaurant_id=restaurant.id) }}">
+                                <button type="submit" class="btn btn-sm btn-danger">Cancelar</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="alert alert-info">Nenhum pedido encontrado para este restaurante.</div>
+    {% endif %}
+</div>
+{% endblock %}

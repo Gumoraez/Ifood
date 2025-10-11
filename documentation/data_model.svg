@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .title { font: bold 20px sans-serif; }
+    .table-title { font: bold 16px sans-serif; }
+    .column { font: 14px sans-serif; }
+    .pk { font-weight: bold; }
+    .fk { font-style: italic; }
+    .table { fill: white; stroke: #333; stroke-width: 2; }
+    .relation { stroke: #666; stroke-width: 1.5; marker-end: url(#arrowhead); }
+  </style>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+    </marker>
+  </defs>
+  
+  <!-- Título -->
+  <text x="400" y="30" text-anchor="middle" class="title">Modelo de Dados Físico - iFood Replica</text>
+  
+  <!-- Tabela User -->
+  <rect x="50" y="60" width="200" height="200" rx="5" class="table" />
+  <text x="150" y="85" text-anchor="middle" class="table-title">User</text>
+  <line x1="50" y1="95" x2="250" y2="95" stroke="#333" stroke-width="1.5" />
+  
+  <text x="60" y="120" class="column pk">id (INT, PK)</text>
+  <text x="60" y="140" class="column">name (VARCHAR(100))</text>
+  <text x="60" y="160" class="column">email (VARCHAR(100), UNIQUE)</text>
+  <text x="60" y="180" class="column">password (VARCHAR(200))</text>
+  <text x="60" y="200" class="column">address (VARCHAR(200))</text>
+  <text x="60" y="220" class="column">phone (VARCHAR(20))</text>
+  <text x="60" y="240" class="column">is_restaurant (BOOLEAN)</text>
+  <text x="60" y="260" class="column">social_id (VARCHAR(100))</text>
+  <text x="60" y="280" class="column">social_provider (VARCHAR(20))</text>
+  
+  <!-- Tabela Restaurant -->
+  <rect x="300" y="60" width="200" height="180" rx="5" class="table" />
+  <text x="400" y="85" text-anchor="middle" class="table-title">Restaurant</text>
+  <line x1="300" y1="95" x2="500" y2="95" stroke="#333" stroke-width="1.5" />
+  
+  <text x="310" y="120" class="column pk">id (INT, PK)</text>
+  <text x="310" y="140" class="column">name (VARCHAR(100))</text>
+  <text x="310" y="160" class="column">description (TEXT)</text>
+  <text x="310" y="180" class="column">address (VARCHAR(200))</text>
+  <text x="310" y="200" class="column">phone (VARCHAR(20))</text>
+  <text x="310" y="220" class="column">image_url (VARCHAR(200))</text>
+  <text x="310" y="240" class="column fk">owner_id (INT, FK)</text>
+  
+  <!-- Tabela MenuItem -->
+  <rect x="550" y="60" width="200" height="180" rx="5" class="table" />
+  <text x="650" y="85" text-anchor="middle" class="table-title">MenuItem</text>
+  <line x1="550" y1="95" x2="750" y2="95" stroke="#333" stroke-width="1.5" />
+  
+  <text x="560" y="120" class="column pk">id (INT, PK)</text>
+  <text x="560" y="140" class="column">name (VARCHAR(100))</text>
+  <text x="560" y="160" class="column">description (TEXT)</text>
+  <text x="560" y="180" class="column">price (DECIMAL(10,2))</text>
+  <text x="560" y="200" class="column">image_url (VARCHAR(200))</text>
+  <text x="560" y="220" class="column">category (VARCHAR(50))</text>
+  <text x="560" y="240" class="column fk">restaurant_id (INT, FK)</text>
+  
+  <!-- Tabela Order -->
+  <rect x="50" y="300" width="200" height="160" rx="5" class="table" />
+  <text x="150" y="325" text-anchor="middle" class="table-title">Order</text>
+  <line x1="50" y1="335" x2="250" y2="335" stroke="#333" stroke-width="1.5" />
+  
+  <text x="60" y="360" class="column pk">id (INT, PK)</text>
+  <text x="60" y="380" class="column">total (DECIMAL(10,2))</text>
+  <text x="60" y="400" class="column">status (VARCHAR(20))</text>
+  <text x="60" y="420" class="column">date (DATETIME)</text>
+  <text x="60" y="440" class="column">address (VARCHAR(200))</text>
+  <text x="60" y="460" class="column fk">user_id (INT, FK)</text>
+  
+  <!-- Tabela OrderItem -->
+  <rect x="300" y="300" width="200" height="160" rx="5" class="table" />
+  <text x="400" y="325" text-anchor="middle" class="table-title">OrderItem</text>
+  <line x1="300" y1="335" x2="500" y2="335" stroke="#333" stroke-width="1.5" />
+  
+  <text x="310" y="360" class="column pk">id (INT, PK)</text>
+  <text x="310" y="380" class="column">quantity (INT)</text>
+  <text x="310" y="400" class="column">price (DECIMAL(10,2))</text>
+  <text x="310" y="420" class="column fk">order_id (INT, FK)</text>
+  <text x="310" y="440" class="column fk">menu_item_id (INT, FK)</text>
+  
+  <!-- Tabela OAuth -->
+  <rect x="550" y="300" width="200" height="120" rx="5" class="table" />
+  <text x="650" y="325" text-anchor="middle" class="table-title">OAuth</text>
+  <line x1="550" y1="335" x2="750" y2="335" stroke="#333" stroke-width="1.5" />
+  
+  <text x="560" y="360" class="column pk">id (INT, PK)</text>
+  <text x="560" y="380" class="column">token (TEXT)</text>
+  <text x="560" y="400" class="column">provider (VARCHAR(50))</text>
+  <text x="560" y="420" class="column fk">user_id (INT, FK)</text>
+  
+  <!-- Relações -->
+  <line x1="250" y1="240" x2="300" y2="240" class="relation" />
+  <line x1="500" y1="240" x2="550" y2="240" class="relation" />
+  <line x1="150" y1="260" x2="150" y2="300" class="relation" />
+  <line x1="250" y1="420" x2="300" y2="420" class="relation" />
+  <line x1="500" y1="440" x2="550" y2="440" class="relation" />
+  <line x1="250" y1="280" x2="550" y2="400" class="relation" />
+</svg>

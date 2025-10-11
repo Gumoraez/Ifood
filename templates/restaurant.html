@@ -1,0 +1,146 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ restaurant.name }}{% endblock %}
+
+{% block content %}
+<div class="restaurant-header" style="background-image: url('{{ url_for('static', filename='images/restaurant-bg.jpg') }}');">
+    <div class="restaurant-header-overlay">
+        <div class="d-flex align-items-center">
+            <img src="{{ restaurant.logo or url_for('static', filename='images/restaurant-placeholder.jpg') }}" alt="{{ restaurant.name }}" class="restaurant-logo">
+            <div class="text-white">
+                <h2 class="mb-0">{{ restaurant.name }}</h2>
+                <div class="d-flex align-items-center">
+                    <span class="me-3"><i class="fas fa-star text-warning"></i> {{ restaurant.rating|round(1) }}</span>
+                    <span class="me-3">{{ restaurant.category }}</span>
+                    <span><i class="far fa-clock"></i> {{ restaurant.delivery_time }} min</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Sobre</h5>
+                <p class="card-text">{{ restaurant.description }}</p>
+                <p class="mb-0"><i class="fas fa-map-marker-alt text-danger"></i> {{ restaurant.address }}</p>
+            </div>
+        </div>
+
+        <h4 class="mb-3">Cardápio</h4>
+        
+        {% if menu_items %}
+            {% set categories = {} %}
+            {% for item in menu_items %}
+                {% if item.category not in categories %}
+                    {% set _ = categories.update({item.category: []}) %}
+                {% endif %}
+                {% set _ = categories[item.category].append(item) %}
+            {% endfor %}
+            
+            <div class="list-group mb-3 menu-category">
+                {% for category in categories %}
+                    <a href="#category-{{ category|replace(' ', '-')|lower }}" class="list-group-item list-group-item-action">{{ category }}</a>
+                {% endfor %}
+            </div>
+            
+            {% for category, items in categories.items() %}
+                <div id="category-{{ category|replace(' ', '-')|lower }}" class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">{{ category }}</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        {% for item in items %}
+                            <div class="menu-item p-3">
+                                <div class="row">
+                                    <div class="col-9">
+                                        <h5 class="mb-1">{{ item.name }}</h5>
+                                        <p class="text-muted mb-2">{{ item.description }}</p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0 text-danger">R$ {{ item.price|round(2) }}</h6>
+                                            <button class="btn btn-sm btn-outline-danger add-to-cart"
+                                                    data-item-id="{{ item.id }}"
+                                                    data-item-name="{{ item.name }}"
+                                                    data-item-price="{{ item.price }}"
+                                                    data-restaurant-id="{{ restaurant.id }}"
+                                                    data-restaurant-name="{{ restaurant.name }}">
+                                                <i class="fas fa-plus"></i> Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        {% if item.image %}
+                                            <img src="{{ item.image }}" alt="{{ item.name }}" class="menu-item-img">
+                                        {% else %}
+                                            <img src="{{ url_for('static', filename='images/food-placeholder.jpg') }}" alt="{{ item.name }}" class="menu-item-img">
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                Este restaurante ainda não possui itens no cardápio.
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card cart-summary">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Seu Pedido</h5>
+            </div>
+            <div class="card-body">
+                <div id="cart-empty" class="text-center {% if cart and cart.items %}d-none{% endif %}">
+                    <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                    <p>Seu carrinho está vazio</p>
+                    <p class="text-muted">Adicione itens do cardápio para fazer seu pedido</p>
+                </div>
+                
+                <div id="cart-content" class="{% if not cart or not cart.items %}d-none{% endif %}">
+                    <h6 class="mb-3" id="restaurant-name">{{ restaurant.name }}</h6>
+                    
+                    <div id="cart-items" class="mb-3">
+                        <!-- Itens do carrinho serão adicionados via JavaScript -->
+                    </div>
+                    
+                    <div class="d-flex justify-content-between border-top pt-3">
+                        <h6>Total:</h6>
+                        <h6 id="cart-total">R$ 0.00</h6>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{{ url_for('cart') }}" class="btn btn-danger">
+                            <i class="fas fa-shopping-cart"></i> Ver Carrinho
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Rolagem suave para as categorias
+    document.querySelectorAll('.menu-category a').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const targetId = this.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+            
+            window.scrollTo({
+                top: targetElement.offsetTop - 100,
+                behavior: 'smooth'
+            });
+        });
+    });
+</script>
+{% endblock %}

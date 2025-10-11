@@ -1,0 +1,70 @@
+{% extends 'layout.html' %}
+
+{% block title %}Detalhes do Usuário{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Detalhes do Usuário</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4 font-weight-bold">Nome:</div>
+                        <div class="col-md-8">{{ user.name }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 font-weight-bold">Email:</div>
+                        <div class="col-md-8">{{ user.email }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 font-weight-bold">Telefone:</div>
+                        <div class="col-md-8">{{ user.phone }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 font-weight-bold">Endereço:</div>
+                        <div class="col-md-8">{{ user.address }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4 font-weight-bold">Tipo de Conta:</div>
+                        <div class="col-md-8">{% if user.is_restaurant %}Restaurante{% else %}Cliente{% endif %}</div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-primary">Editar</a>
+                        <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteModal">
+                            Excluir Conta
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">Voltar</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação de exclusão -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirmar Exclusão</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <form action="{{ url_for('delete_user', user_id=user.id) }}" method="post">
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

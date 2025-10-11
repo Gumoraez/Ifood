@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+
+{% block title %}Criar Conta de Restaurante{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Criar Conta de Restaurante</h4>
+                <span class="badge bg-light text-danger">Etapa 1 de 2</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Primeiro, crie a conta do responsável pelo restaurante. Na próxima etapa, você cadastrará os detalhes do seu restaurante (nome, categoria, descrição, endereço, etc.).</p>
+                <form method="POST" action="{{ url_for('register_restaurant') }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Nome do Responsável</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email de Acesso</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Celular de Contato</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="password" class="form-label">Senha da Conta</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                    </div>
+                    <div class="alert alert-secondary" role="alert">
+                        Após criar a conta, você será redirecionado para cadastrar as informações do seu restaurante (Etapa 2).
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">Continuar</button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+                <div class="text-center">
+                    <p class="mb-2">Ou crie a conta do responsável com:</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('google.login') }}" class="btn btn-outline-primary">
+                            <i class="fab fa-google"></i> Continuar com Google
+                        </a>
+                        <a href="{{ url_for('facebook.login') }}" class="btn btn-outline-primary">
+                            <i class="fab fa-facebook"></i> Continuar com Facebook
+                        </a>
+                    </div>
+                    <small class="text-muted d-block mt-2">Ao entrar com Google/Facebook, sua conta será marcada como restaurante e você será direcionado automaticamente para cadastrar seu restaurante (Etapa 2).</small>
+                </div>
+            </div>
+            <div class="card-footer text-center">
+                <p class="mb-0">Já tem conta de restaurante? <a href="{{ url_for('login') }}">Entrar</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
