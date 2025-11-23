@@ -1,8 +1,8 @@
-/* Tema moderno para Ifood! */
+/* Tema moderno para Food Delivery */
 :root {
   --bg-start: #ffffff;
   --bg-end: #ffffff;
-  --accent: #e50914;  /* ifood red */
+  --accent: #e74c3c;  /* vermelho */
   --accent-hover: #c20710;
   --text: #1f2937;    /* gray-800 */
   --muted: #6b7280;   /* gray-500 */
@@ -70,6 +70,7 @@ body {
   border: 1px solid var(--accent);
   text-decoration: none;
 }
+.category-chip.active { background: var(--accent); border-color: var(--accent); color: #ffffff; }
 .category-chip:hover { background: var(--accent); border-color: var(--accent); color: #ffffff; }
 
 /* Cards */

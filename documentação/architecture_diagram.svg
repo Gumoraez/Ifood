@@ -19,7 +19,7 @@
   </defs>
   
   <!-- Título -->
-  <text x="400" y="30" text-anchor="middle" class="title">Arquitetura do Sistema iFood Replica</text>
+  <text x="400" y="30" text-anchor="middle" class="title">Arquitetura do Sistema Food Delivery</text>
   
   <!-- Cliente (Frontend) -->
   <rect x="50" y="80" width="200" height="120" rx="10" class="box client" />

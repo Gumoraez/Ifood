@@ -1,0 +1,136 @@
+{% extends "layout.html" %}
+
+{% block title %}Meus Favoritos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0"><i class="fas fa-heart text-danger"></i> Meus Restaurantes Favoritos</h3>
+    <a href="{{ url_for('list_restaurants') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Voltar aos Restaurantes
+    </a>
+</div>
+
+{% if restaurants %}
+<div class="row">
+    {% for restaurant in restaurants %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <img src="{{ restaurant.image_url or url_for('static', filename='images/restaurant-placeholder.jpg') }}" 
+                 class="card-img-top" alt="{{ restaurant.name }}" style="height: 200px; object-fit: cover;">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">{{ restaurant.name }}</h5>
+                <p class="card-text text-muted">{{ restaurant.description or 'Sem descrição disponível' }}</p>
+                
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <small class="text-muted">Categoria</small>
+                        <div class="fw-bold">{{ restaurant.category }}</div>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Entrega</small>
+                        <div class="fw-bold">R$ {{ "%.2f"|format(restaurant.delivery_fee) }}</div>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Tempo</small>
+                        <div class="fw-bold">{{ restaurant.delivery_time }} min</div>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-auto">
+                        <i class="fas fa-star text-warning"></i>
+                        <span class="fw-bold">{{ "%.1f"|format(restaurant.rating) }}</span>
+                        <small class="text-muted">({{ restaurant.rating }})</small>
+                    </div>
+                    <button class="btn btn-danger btn-sm favorite-btn" 
+                            data-restaurant-id="{{ restaurant.id }}" 
+                            data-action="unfavorite">
+                        <i class="fas fa-heart"></i>
+                    </button>
+                </div>
+                
+                <div class="mt-auto">
+                    <a href="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" 
+                       class="btn btn-outline-danger w-100">
+                        <i class="fas fa-eye"></i> Ver Cardápio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-heart-broken text-muted" style="font-size: 4rem;"></i>
+    <h4 class="mt-3 text-muted">Nenhum favorito ainda</h4>
+    <p class="text-muted">Você ainda não favoritou nenhum restaurante.</p>
+    <a href="{{ url_for('list_restaurants') }}" class="btn btn-danger">
+        <i class="fas fa-search"></i> Explorar Restaurantes
+    </a>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Funcionalidade dos botões de favoritos
+    const favoriteButtons = document.querySelectorAll('.favorite-btn');
+    
+    favoriteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const restaurantId = this.dataset.restaurantId;
+            const action = this.dataset.action;
+            const url = `/restaurants/${restaurantId}/unfavorite`;
+            
+            if (confirm('Deseja remover este restaurante dos seus favoritos?')) {
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remover o card do restaurante
+                        this.closest('.col-md-6').remove();
+                        
+                        // Verificar se ainda há favoritos
+                        const remainingCards = document.querySelectorAll('.col-md-6');
+                        if (remainingCards.length === 0) {
+                            location.reload(); // Recarregar para mostrar a mensagem de "nenhum favorito"
+                        }
+                        
+                        // Mostrar mensagem de sucesso
+                        const toast = document.createElement('div');
+                        toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed top-0 end-0 m-3';
+                        toast.style.zIndex = '9999';
+                        toast.innerHTML = `
+                            <div class="d-flex">
+                                <div class="toast-body">${data.message}</div>
+                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                            </div>
+                        `;
+                        document.body.appendChild(toast);
+                        
+                        const bsToast = new bootstrap.Toast(toast);
+                        bsToast.show();
+                        
+                        // Remover o toast após 3 segundos
+                        setTimeout(() => {
+                            toast.remove();
+                        }, 3000);
+                    } else {
+                        alert('Erro: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao processar solicitação');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

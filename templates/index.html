@@ -19,13 +19,14 @@
 </div>
 
 <div class="category-chips mb-4">
-    <a href="#" class="category-chip"><i class="fas fa-hamburger"></i> Lanches</a>
-    <a href="#" class="category-chip"><i class="fas fa-pizza-slice"></i> Pizza</a>
-    <a href="#" class="category-chip"><i class="fas fa-drumstick-bite"></i> Frango</a>
-    <a href="#" class="category-chip"><i class="fas fa-fish"></i> Japonesa</a>
-    <a href="#" class="category-chip"><i class="fas fa-ice-cream"></i> Sobremesas</a>
-    <a href="#" class="category-chip"><i class="fas fa-coffee"></i> Café</a>
-    <a href="#" class="category-chip"><i class="fas fa-utensils"></i> Brasileira</a>
+    <a href="{{ url_for('index') }}" class="category-chip {% if not selected_category %}active{% endif %}"><i class="fas fa-border-none"></i> Todas</a>
+    <a href="{{ url_for('index', category='Lanches') }}" class="category-chip {% if selected_category == 'Lanches' %}active{% endif %}"><i class="fas fa-hamburger"></i> Lanches</a>
+    <a href="{{ url_for('index', category='Pizza') }}" class="category-chip {% if selected_category == 'Pizza' %}active{% endif %}"><i class="fas fa-pizza-slice"></i> Pizza</a>
+    <a href="{{ url_for('index', category='Frango') }}" class="category-chip {% if selected_category == 'Frango' %}active{% endif %}"><i class="fas fa-drumstick-bite"></i> Frango</a>
+    <a href="{{ url_for('index', category='Japonesa') }}" class="category-chip {% if selected_category == 'Japonesa' %}active{% endif %}"><i class="fas fa-fish"></i> Japonesa</a>
+    <a href="{{ url_for('index', category='Sobremesas') }}" class="category-chip {% if selected_category == 'Sobremesas' %}active{% endif %}"><i class="fas fa-ice-cream"></i> Sobremesas</a>
+    <a href="{{ url_for('index', category='Café') }}" class="category-chip {% if selected_category == 'Café' %}active{% endif %}"><i class="fas fa-coffee"></i> Café</a>
+    <a href="{{ url_for('index', category='Brasileira') }}" class="category-chip {% if selected_category == 'Brasileira' %}active{% endif %}"><i class="fas fa-utensils"></i> Brasileira</a>
 </div>
 
 <div class="row mb-4">

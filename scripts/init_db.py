@@ -3,8 +3,8 @@ import sqlite3
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / 'instance' / 'ifood.db'
-SCHEMA_PATH = BASE_DIR / 'documentation' / 'create_database.sql'
+DB_PATH = BASE_DIR / 'instance' / 'delivery.db'
+SCHEMA_PATH = BASE_DIR / 'documentação' / 'create_database.sql'
 
 # Garantir que a pasta instance exista
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)

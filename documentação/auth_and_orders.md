@@ -1,6 +1,6 @@
 # Autenticação e Fluxo de Pedidos
 
-Este documento descreve as funcionalidades e regras de negócio dos módulos de autenticação e de solicitação/acompanhamento de pedidos do sistema iFood Replica.
+Este documento descreve as funcionalidades e regras de negócio dos módulos de autenticação e de solicitação/acompanhamento de pedidos do sistema Food Delivery.
 
 1) Autenticação
 - Registro de usuário (cliente): formulário com nome, email, senha; persiste no banco e inicia sessão automaticamente após registro. <mcfile name="app.py" path="C:\Users\Gustavo Moraes\Documents\Ifood!\app.py"></mcfile>
@@ -8,6 +8,8 @@ Este documento descreve as funcionalidades e regras de negócio dos módulos de 
 - Login tradicional: valida email/senha e inicia sessão com Flask-Login; Logout encerra a sessão. <mcfile name="login.html" path="C:\Users\Gustavo Moraes\Documents\Ifood!\templates\login.html"></mcfile> <mcfile name="app.py" path="C:\Users\Gustavo Moraes\Documents\Ifood!\app.py"></mcfile>
 - Login social (Google/Facebook): se email não existir, cria nova conta com campos social_id/social_provider e faz login; caso exista, associa login e inicia sessão. <mcsymbol name="google_login" filename="app.py" path="C:\Users\Gustavo Moraes\Documents\Ifood!\app.py" startline="225" type="function"></mcsymbol> <mcsymbol name="facebook_login" filename="app.py" path="C:\Users\Gustavo Moraes\Documents\Ifood!\app.py" startline="257" type="function"></mcsymbol>
 - Perfis e permissões: campos is_admin e is_restaurant controlam acesso; rotas protegidas exigem login e validam dono (owner) do recurso ou admin.
+- Confirmação de contato (email/telefone): após registro, o usuário escolhe canal (email ou SMS/WhatsApp) para receber um código de verificação; o código é validado na rota de verificação antes de liberar ações sensíveis (ex.: finalização de pedido). Em ambiente sem credenciais, o código é simulado nos logs; com credenciais válidas, é enviado de fato via SMTP (email) ou Twilio (SMS/WhatsApp).
+- Reenvio e limites: o reenvio de código está disponível, com recomendação de aplicar cooldown para evitar abuso; o sistema registra tentativas e retorna mensagens claras em caso de falha de entrega ou verificação incorreta.
 
 2) Fluxo de Pedido (da escolha à entrega)
 - Escolha de restaurante e itens: página do restaurante exibe cardápio e permite adicionar itens ao carrinho via JS. <mcsymbol name="restaurant" filename="app.py" path="C:\Users\Gustavo Moraes\Documents\Ifood!\app.py" startline="292" type="function"></mcsymbol> <mcfile name="restaurant.html" path="C:\Users\Gustavo Moraes\Documents\Ifood!\templates\restaurant.html"></mcfile> <mcfile name="static/js/main.js" path="C:\Users\Gustavo Moraes\Documents\Ifood!\static\js\main.js"></mcfile>
@@ -28,7 +30,8 @@ Este documento descreve as funcionalidades e regras de negócio dos módulos de 
 - Sessão: gerenciada por Flask-Login, rotas @login_required protegem ações sensíveis.
 - Permissões: validação consistente de owner/admin nas rotas de restaurante, itens do menu e pedidos.
 - Sugestões: adicionar CSRF tokens em formulários, auditoria de eventos (logs), e taxa de pedidos limitada por usuário para evitar abuso.
+- Entrega de códigos: integração com SMTP (Flask-Mail) e Twilio; em caso de falha de autenticação/entrega, o sistema registra erro claro no log e orienta correção de credenciais.
 
 5) Referências de dados e rotas
-- Modelos principais: User, Restaurant, MenuItem, Order, OrderItem, OAuth. <mcfile name="create_database.sql" path="C:\Users\Gustavo Moraes\Documents\Ifood!\documentation\create_database.sql"></mcfile>
+- Modelos principais: User, Restaurant, MenuItem, Order, OrderItem, OAuth. <mcfile name="create_database.sql" path="C:\Users\Gustavo Moraes\Documents\Ifood!\documentação\create_database.sql"></mcfile>
 - Banco de dados: SQLite por padrão (configurado em SQLALCHEMY_DATABASE_URI). <mcfile name="app.py" path="C:\Users\Gustavo Moraes\Documents\Ifood!\app.py"></mcfile>

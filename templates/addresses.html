@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+
+{% block title %}Meus Endereços{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Meus Endereços</h2>
+        <a href="{{ url_for('create_address') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Adicionar Endereço
+        </a>
+    </div>
+
+    {% if addresses %}
+        <div class="row">
+            {% for address in addresses %}
+            <div class="col-md-6 mb-4">
+                <div class="card {% if address.is_default %}border-primary{% endif %}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            {{ address.name }}
+                            {% if address.is_default %}
+                                <span class="badge bg-primary ms-2">Padrão</span>
+                            {% endif %}
+                        </h5>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                Ações
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('edit_address', address_id=address.id) }}">
+                                        <i class="fas fa-edit"></i> Editar
+                                    </a>
+                                </li>
+                                {% if not address.is_default %}
+                                <li>
+                                    <form method="POST" action="{{ url_for('set_default_address', address_id=address.id) }}" class="d-inline">
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="fas fa-star"></i> Definir como Padrão
+                                        </button>
+                                    </form>
+                                </li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ address.id }}">
+                                        <i class="fas fa-trash"></i> Excluir
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <address class="mb-0">
+                            <strong>{{ address.street }}, {{ address.number }}</strong><br>
+                            {% if address.complement %}{{ address.complement }}<br>{% endif %}
+                            {{ address.neighborhood }}<br>
+                            {{ address.city }} - {{ address.state }}<br>
+                            CEP: {{ address.zip_code }}
+                            {% if address.reference %}
+                                <br><small class="text-muted">Referência: {{ address.reference }}</small>
+                            {% endif %}
+                        </address>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Confirmação de Exclusão -->
+            <div class="modal fade" id="deleteModal{{ address.id }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirmar Exclusão</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Tem certeza que deseja excluir o endereço <strong>{{ address.name }}</strong>?</p>
+                            <div class="alert alert-warning">
+                                <small>Esta ação não pode ser desfeita.</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <form method="POST" action="{{ url_for('delete_address', address_id=address.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-danger">Excluir</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">Nenhum endereço cadastrado</h4>
+            <p class="text-muted">Adicione seu primeiro endereço para facilitar seus pedidos.</p>
+            <a href="{{ url_for('create_address') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Adicionar Primeiro Endereço
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

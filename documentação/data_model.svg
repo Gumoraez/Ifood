@@ -17,7 +17,7 @@
   </defs>
   
   <!-- Título -->
-  <text x="400" y="30" text-anchor="middle" class="title">Modelo de Dados Físico - iFood Replica</text>
+  <text x="400" y="30" text-anchor="middle" class="title">Modelo de Dados Físico - Food Delivery System</text>
   
   <!-- Tabela User -->
   <rect x="50" y="60" width="200" height="200" rx="5" class="table" />

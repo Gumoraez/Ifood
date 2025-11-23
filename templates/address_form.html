@@ -1,0 +1,233 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    {% if address %}Editar Endereço{% else %}Novo Endereço{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        {% if address %}
+                            <i class="fas fa-edit"></i> Editar Endereço
+                        {% else %}
+                            <i class="fas fa-plus"></i> Novo Endereço
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="address-form">
+                        <div class="mb-3 d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary" id="use-my-location">
+                                <i class="fas fa-location-crosshairs"></i> Usar minha localização
+                            </button>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Nome do Endereço *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="name" 
+                                       name="name" 
+                                       value="{{ address.name if address else '' }}"
+                                       placeholder="Ex: Casa, Trabalho, Apartamento"
+                                       required>
+                                <div class="form-text">Como você quer identificar este endereço?</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="zip_code" class="form-label">CEP *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="zip_code" 
+                                       name="zip_code" 
+                                       value="{{ address.zip_code if address else '' }}"
+                                       placeholder="00000-000"
+                                       pattern="[0-9]{5}-?[0-9]{3}"
+                                       required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="street" class="form-label">Rua/Avenida *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="street" 
+                                       name="street" 
+                                       value="{{ address.street if address else '' }}"
+                                       placeholder="Nome da rua ou avenida"
+                                       required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="number" class="form-label">Número *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="number" 
+                                       name="number" 
+                                       value="{{ address.number if address else '' }}"
+                                       placeholder="123"
+                                       required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="complement" class="form-label">Complemento</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="complement" 
+                                   name="complement" 
+                                   value="{{ address.complement if address else '' }}"
+                                   placeholder="Apartamento, bloco, casa, etc.">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="neighborhood" class="form-label">Bairro *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="neighborhood" 
+                                       name="neighborhood" 
+                                       value="{{ address.neighborhood if address else '' }}"
+                                       placeholder="Nome do bairro"
+                                       required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="city" class="form-label">Cidade *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="city" 
+                                       name="city" 
+                                       value="{{ address.city if address else '' }}"
+                                       placeholder="Nome da cidade"
+                                       required>
+                            </div>
+                            <div class="col-md-2 mb-3">
+                                <label for="state" class="form-label">Estado *</label>
+                                <select class="form-select" id="state" name="state" required>
+                                    <option value="">UF</option>
+                                    <option value="AC" {% if address and address.state == 'AC' %}selected{% endif %}>AC</option>
+                                    <option value="AL" {% if address and address.state == 'AL' %}selected{% endif %}>AL</option>
+                                    <option value="AP" {% if address and address.state == 'AP' %}selected{% endif %}>AP</option>
+                                    <option value="AM" {% if address and address.state == 'AM' %}selected{% endif %}>AM</option>
+                                    <option value="BA" {% if address and address.state == 'BA' %}selected{% endif %}>BA</option>
+                                    <option value="CE" {% if address and address.state == 'CE' %}selected{% endif %}>CE</option>
+                                    <option value="DF" {% if address and address.state == 'DF' %}selected{% endif %}>DF</option>
+                                    <option value="ES" {% if address and address.state == 'ES' %}selected{% endif %}>ES</option>
+                                    <option value="GO" {% if address and address.state == 'GO' %}selected{% endif %}>GO</option>
+                                    <option value="MA" {% if address and address.state == 'MA' %}selected{% endif %}>MA</option>
+                                    <option value="MT" {% if address and address.state == 'MT' %}selected{% endif %}>MT</option>
+                                    <option value="MS" {% if address and address.state == 'MS' %}selected{% endif %}>MS</option>
+                                    <option value="MG" {% if address and address.state == 'MG' %}selected{% endif %}>MG</option>
+                                    <option value="PA" {% if address and address.state == 'PA' %}selected{% endif %}>PA</option>
+                                    <option value="PB" {% if address and address.state == 'PB' %}selected{% endif %}>PB</option>
+                                    <option value="PR" {% if address and address.state == 'PR' %}selected{% endif %}>PR</option>
+                                    <option value="PE" {% if address and address.state == 'PE' %}selected{% endif %}>PE</option>
+                                    <option value="PI" {% if address and address.state == 'PI' %}selected{% endif %}>PI</option>
+                                    <option value="RJ" {% if address and address.state == 'RJ' %}selected{% endif %}>RJ</option>
+                                    <option value="RN" {% if address and address.state == 'RN' %}selected{% endif %}>RN</option>
+                                    <option value="RS" {% if address and address.state == 'RS' %}selected{% endif %}>RS</option>
+                                    <option value="RO" {% if address and address.state == 'RO' %}selected{% endif %}>RO</option>
+                                    <option value="RR" {% if address and address.state == 'RR' %}selected{% endif %}>RR</option>
+                                    <option value="SC" {% if address and address.state == 'SC' %}selected{% endif %}>SC</option>
+                                    <option value="SP" {% if address and address.state == 'SP' %}selected{% endif %}>SP</option>
+                                    <option value="SE" {% if address and address.state == 'SE' %}selected{% endif %}>SE</option>
+                                    <option value="TO" {% if address and address.state == 'TO' %}selected{% endif %}>TO</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="reference" class="form-label">Ponto de Referência</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="reference" 
+                                   name="reference" 
+                                   value="{{ address.reference if address else '' }}"
+                                   placeholder="Ex: Próximo ao shopping, em frente à padaria">
+                            <div class="form-text">Ajude o entregador a encontrar seu endereço</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       id="is_default" 
+                                       name="is_default"
+                                       {% if address and address.is_default %}checked{% endif %}>
+                                <label class="form-check-label" for="is_default">
+                                    Definir como endereço padrão
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                {% if address %}Atualizar{% else %}Salvar{% endif %} Endereço
+                            </button>
+                            <a href="{{ url_for('list_addresses') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Máscara para CEP
+document.getElementById('zip_code').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length >= 5) {
+        value = value.replace(/^(\d{5})(\d)/, '$1-$2');
+    }
+    e.target.value = value;
+});
+
+// Buscar endereço por CEP (simulação - em produção usar API dos Correios)
+document.getElementById('zip_code').addEventListener('blur', function(e) {
+    const cep = e.target.value.replace(/\D/g, '');
+    if (cep.length === 8) {
+        // Aqui você pode integrar com a API dos Correios ou ViaCEP
+        console.log('Buscar endereço para CEP:', cep);
+    }
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('use-my-location');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    if (!navigator.geolocation) { alert('Seu navegador não suporta geolocalização.'); return; }
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      const lat = pos.coords.latitude; const lon = pos.coords.longitude;
+      fetch(`{{ url_for('api_reverse_geocode') }}?lat=${lat}&lon=${lon}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.ok) throw new Error(data.error || 'Falha ao obter endereço');
+          const a = data.address || {};
+          const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+          setVal('name', document.getElementById('name').value || 'Casa');
+          setVal('street', a.street || '');
+          setVal('number', a.number || '');
+          setVal('neighborhood', a.neighborhood || '');
+          setVal('city', a.city || 'São Paulo');
+          const st = document.getElementById('state'); if (st) st.value = (a.state || 'SP');
+          setVal('zip_code', a.zip_code || '');
+        })
+        .catch(err => alert(err.message || 'Erro ao usar localização'))
+        .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização'; });
+    }, function(err) {
+      alert('Não foi possível obter sua localização (' + err.message + ').');
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização';
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+  });
+});
+</script>
+{% endblock %}

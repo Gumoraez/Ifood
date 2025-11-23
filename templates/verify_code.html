@@ -1,0 +1,109 @@
+{% extends "layout.html" %}
+
+{% block title %}Verificação de Código{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Verificação de Código</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-2">
+                        Digite o código de 6 dígitos enviado para <strong>{{ user.email }}</strong>
+                    </p>
+                    {% if show_dev_code and dev_code %}
+                    <div class="alert alert-warning" role="alert">
+                        Código (desenvolvimento): <strong>{{ dev_code }}</strong>
+                    </div>
+                    {% endif %}
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="verification_code" class="form-label">Código de Verificação</label>
+                            <input type="text" 
+                                   class="form-control text-center" 
+                                   id="verification_code" 
+                                   name="verification_code" 
+                                   maxlength="6" 
+                                   pattern="[0-9]{6}" 
+                                   placeholder="000000"
+                                   style="font-size: 1.5rem; letter-spacing: 0.5rem;"
+                                   required>
+                            <div class="form-text">Digite apenas os 6 números recebidos</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Verificar Código</button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <p class="text-muted mb-2">Não recebeu o código?</p>
+                        {% if has_email %}
+                        <form method="POST" action="{{ url_for('resend_code', user_id=user.id) }}" class="d-inline">
+                            <input type="hidden" name="method" value="email" />
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                Reenviar por Email
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if has_phone %}
+                        <form method="POST" action="{{ url_for('resend_code', user_id=user.id) }}" class="d-inline ms-2">
+                            <input type="hidden" name="method" value="sms" />
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                Reenviar por SMS
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('resend_code', user_id=user.id) }}" class="d-inline ms-2">
+                            <input type="hidden" name="method" value="whatsapp" />
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                Reenviar por WhatsApp
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('login') }}" class="btn btn-link">Voltar ao Login</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-focus no campo de código
+document.getElementById('verification_code').focus();
+
+// Permitir apenas números
+document.getElementById('verification_code').addEventListener('input', function(e) {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+// Auto-submit quando 6 dígitos forem digitados
+document.getElementById('verification_code').addEventListener('input', function(e) {
+    if (this.value.length === 6) {
+        // Pequeno delay para melhor UX
+        setTimeout(() => {
+            this.form.submit();
+        }, 500);
+    }
+});
+
+// Copiar código de desenvolvimento
+document.addEventListener('click', function(e) {
+  const alertEl = e.target.closest('.alert-warning');
+  if (!alertEl) return;
+  const strong = alertEl.querySelector('strong');
+  if (strong) {
+    navigator.clipboard.writeText(strong.textContent.trim()).catch(() => {});
+  }
+});
+</script>
+{% endblock %}

@@ -29,7 +29,57 @@
             </div>
         </div>
 
-        <h4 class="mb-3">Cardápio</h4>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Cardápio</h4>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+                <i class="fas fa-filter"></i> Filtros
+            </button>
+        </div>
+        
+        <!-- Formulário de Filtros -->
+        <div class="collapse mb-4" id="filterCollapse">
+            <div class="card card-body">
+                <form method="GET" action="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="category" class="form-label">Categoria</label>
+                        <select id="category" name="category" class="form-select">
+                            <option value="">Todas as categorias</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="min_price" class="form-label">Preço mínimo (R$)</label>
+                        <input id="min_price" name="min_price" type="number" step="0.01" min="0" class="form-control" value="{{ min_price or '' }}" placeholder="0,00">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="max_price" class="form-label">Preço máximo (R$)</label>
+                        <input id="max_price" name="max_price" type="number" step="0.01" min="0" class="form-control" value="{{ max_price or '' }}" placeholder="100,00">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="sort" class="form-label">Ordenar por</label>
+                        <select id="sort" name="sort" class="form-select">
+                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Nome</option>
+                            <option value="price_asc" {% if sort_by == 'price_asc' %}selected{% endif %}>Menor preço</option>
+                            <option value="price_desc" {% if sort_by == 'price_desc' %}selected{% endif %}>Maior preço</option>
+                            <option value="category" {% if sort_by == 'category' %}selected{% endif %}>Categoria</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="available" name="available" value="true" {% if available_only %}checked{% endif %}>
+                            <label class="form-check-label" for="available">
+                                Apenas disponíveis
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="submit" class="btn btn-danger">Filtrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
         
         {% if menu_items %}
             {% set categories = {} %}
@@ -40,14 +90,18 @@
                 {% set _ = categories[item.category].append(item) %}
             {% endfor %}
             
-            <div class="list-group mb-3 menu-category">
+            <div class="category-chips mb-3">
+                <a href="#" class="category-chip active" data-category="__all"><i class="fas fa-border-none"></i> Todas</a>
                 {% for category in categories %}
-                    <a href="#category-{{ category|replace(' ', '-')|lower }}" class="list-group-item list-group-item-action">{{ category }}</a>
+                    <a href="#" class="category-chip" data-category="{{ category }}">
+                        {% if category == 'Pizza' %}<i class="fas fa-pizza-slice"></i>{% elif category == 'Japonesa' %}<i class="fas fa-fish"></i>{% elif category == 'Brasileira' %}<i class="fas fa-utensils"></i>{% elif category == 'Lanches' %}<i class="fas fa-hamburger"></i>{% elif category == 'Frango' %}<i class="fas fa-drumstick-bite"></i>{% elif category == 'Sobremesas' %}<i class="fas fa-ice-cream"></i>{% elif category == 'Café' %}<i class="fas fa-coffee"></i>{% else %}<i class="fas fa-tag"></i>{% endif %}
+                        {{ category }}
+                    </a>
                 {% endfor %}
             </div>
             
             {% for category, items in categories.items() %}
-                <div id="category-{{ category|replace(' ', '-')|lower }}" class="card mb-4">
+                <div id="category-{{ category|replace(' ', '-')|lower }}" class="card mb-4 menu-category-block" data-category="{{ category }}">
                     <div class="card-header bg-light">
                         <h5 class="mb-0">{{ category }}</h5>
                     </div>
@@ -128,19 +182,170 @@
 
 {% block extra_js %}
 <script>
-    // Rolagem suave para as categorias
-    document.querySelectorAll('.menu-category a').forEach(anchor => {
-        anchor.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const targetId = this.getAttribute('href');
-            const targetElement = document.querySelector(targetId);
-            
-            window.scrollTo({
-                top: targetElement.offsetTop - 100,
-                behavior: 'smooth'
-            });
-        });
+  document.addEventListener('DOMContentLoaded', function() {
+    const chipEls = document.querySelectorAll('.category-chips .category-chip');
+    const blocks = document.querySelectorAll('.menu-category-block');
+    const filterForm = document.querySelector('#filterCollapse form');
+    const menuItems = document.querySelectorAll('.menu-item');
+
+    // Função para aplicar filtros de categoria (chips)
+    function applyFilter(selected) {
+      blocks.forEach(block => {
+        const cat = block.getAttribute('data-category') || '';
+        if (selected === '__all' || cat === selected) {
+          block.classList.remove('d-none');
+        } else {
+          block.classList.add('d-none');
+        }
+      });
+    }
+
+    // Função para aplicar filtros dinâmicos de preço e disponibilidade
+    function applyDynamicFilters() {
+      const minPrice = parseFloat(document.getElementById('min_price').value) || 0;
+      const maxPrice = parseFloat(document.getElementById('max_price').value) || Infinity;
+      const availableOnly = document.getElementById('available').checked;
+      const selectedCategory = document.getElementById('category').value;
+
+      menuItems.forEach(item => {
+        const priceText = item.querySelector('.text-danger').textContent;
+        const price = parseFloat(priceText.replace('R$ ', '').replace(',', '.'));
+        const isAvailable = !item.querySelector('.btn').disabled;
+        const itemCategory = item.closest('.menu-category-block').getAttribute('data-category');
+
+        let shouldShow = true;
+
+        // Filtro de preço
+        if (price < minPrice || price > maxPrice) {
+          shouldShow = false;
+        }
+
+        // Filtro de disponibilidade
+        if (availableOnly && !isAvailable) {
+          shouldShow = false;
+        }
+
+        // Filtro de categoria
+        if (selectedCategory && itemCategory !== selectedCategory) {
+          shouldShow = false;
+        }
+
+        // Mostrar/ocultar item
+        if (shouldShow) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+
+      // Ocultar categorias vazias
+      blocks.forEach(block => {
+        const visibleItems = block.querySelectorAll('.menu-item[style="display: block"], .menu-item:not([style*="display: none"])');
+        if (visibleItems.length === 0) {
+          block.style.display = 'none';
+        } else {
+          block.style.display = 'block';
+        }
+      });
+    }
+
+    // Event listeners para chips de categoria
+    chipEls.forEach(chip => {
+      chip.addEventListener('click', function(e) {
+        e.preventDefault();
+        chipEls.forEach(c => c.classList.remove('active'));
+        this.classList.add('active');
+        const selected = this.getAttribute('data-category');
+        
+        // Atualizar select de categoria
+        document.getElementById('category').value = selected === '__all' ? '' : selected;
+        
+        applyFilter(selected);
+        applyDynamicFilters();
+        
+        // Scroll para o primeiro bloco visível
+        const firstVisible = Array.from(blocks).find(b => !b.classList.contains('d-none') && b.style.display !== 'none');
+        if (firstVisible) {
+          firstVisible.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
     });
+
+    // Event listeners para filtros dinâmicos
+    document.getElementById('min_price').addEventListener('input', applyDynamicFilters);
+    document.getElementById('max_price').addEventListener('input', applyDynamicFilters);
+    document.getElementById('available').addEventListener('change', applyDynamicFilters);
+    document.getElementById('category').addEventListener('change', function() {
+      const selectedValue = this.value;
+      
+      // Atualizar chips
+      chipEls.forEach(c => c.classList.remove('active'));
+      if (selectedValue === '') {
+        document.querySelector('[data-category="__all"]').classList.add('active');
+        applyFilter('__all');
+      } else {
+        const targetChip = document.querySelector(`[data-category="${selectedValue}"]`);
+        if (targetChip) {
+          targetChip.classList.add('active');
+          applyFilter(selectedValue);
+        }
+      }
+      
+      applyDynamicFilters();
+    });
+
+    // Aplicar filtro inicial
+    applyFilter('__all');
+    applyDynamicFilters();
+
+    // Botão de limpar filtros
+    const clearFiltersBtn = document.createElement('button');
+    clearFiltersBtn.type = 'button';
+    clearFiltersBtn.className = 'btn btn-outline-secondary btn-sm ms-2';
+    clearFiltersBtn.innerHTML = '<i class="fas fa-times"></i> Limpar';
+    clearFiltersBtn.addEventListener('click', function() {
+      document.getElementById('category').value = '';
+      document.getElementById('min_price').value = '';
+      document.getElementById('max_price').value = '';
+      document.getElementById('available').checked = false;
+      
+      chipEls.forEach(c => c.classList.remove('active'));
+      document.querySelector('[data-category="__all"]').classList.add('active');
+      
+      applyFilter('__all');
+      applyDynamicFilters();
+    });
+
+    // Adicionar botão de limpar ao lado do botão de filtros
+    const filterButton = document.querySelector('[data-bs-target="#filterCollapse"]');
+    filterButton.parentNode.appendChild(clearFiltersBtn);
+  });
 </script>
 {% endblock %}
+    const addButtons = document.querySelectorAll('.add-to-cart');
+    addButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const itemId = this.getAttribute('data-item-id');
+        fetch('{{ url_for('add_to_cart') }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: itemId, quantity: 1 })
+        })
+        .then(resp => {
+          const ct = resp.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) {
+            window.location.href = '{{ url_for('login') }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+            return Promise.reject(new Error('redirect'));
+          }
+          return resp.json();
+        })
+        .then(data => {
+          if (data && data.success) {
+            window.location.href = '{{ url_for('cart') }}';
+          } else if (data) {
+            alert(data.message || 'Não foi possível adicionar ao carrinho');
+          }
+        })
+        .catch(err => { if (!err || err.message !== 'redirect') alert('Erro ao adicionar ao carrinho'); });
+      });
+    });

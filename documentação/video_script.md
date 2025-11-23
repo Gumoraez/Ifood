@@ -48,6 +48,6 @@ Este roteiro orienta a gravação em passos claros, mostrando funcionalidades e 
 - Reforçar que todo CRUD básico (create/read/update/delete) de usuários, restaurantes e itens foi demonstrado.
 
 Localização dos arquivos importantes
-- Script SQL: documentation/create_database.sql
-- Roteiro de vídeo: documentation/video_script.md
-- Template de checkout: templates/checkout.html
+- Script SQL: create_database.sql
+- Roteiro de vídeo: video_script.md
+ - Template de checkout: templates/checkout.html

@@ -1,0 +1,265 @@
+{% extends "layout.html" %}
+
+{% block title %}Produtos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Explorar Produtos</h3>
+    <form class="d-flex" method="GET" action="{{ url_for('list_products') }}" style="max-width: 480px; width: 100%;">
+        <input type="text" name="q" class="form-control me-2" placeholder="Pesquisar por produto ou restaurante" value="{{ q or '' }}">
+        <button class="btn btn-outline-danger" type="submit"><i class="fas fa-search"></i></button>
+    </form>
+    </div>
+
+<div class="card modern-card mb-4">
+    <div class="card-body">
+        <form id="filters-form" method="GET" action="{{ url_for('list_products') }}" class="row g-3 align-items-end">
+            <input type="hidden" name="q" value="{{ q or '' }}">
+            <div class="col-md-3">
+                <label for="category" class="form-label">Categoria</label>
+                <div class="category-chips mb-3">
+                  {% for cat in categories %}
+                    <a href="{{ url_for('list_products', category=cat) }}" class="category-chip {% if selected_category == cat %}active{% endif %}">
+                      {{ cat }}
+                    </a>
+                  {% endfor %}
+                </div>
+                <select name="category" id="category" class="form-select">
+                    <option value="">Todas</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="min_price" class="form-label">Preço mínimo</label>
+                <input type="number" step="0.01" class="form-control" id="min_price" name="min_price" value="{{ min_price or '' }}" placeholder="Ex: 10.00">
+            </div>
+            <div class="col-md-3">
+                <label for="max_price" class="form-label">Preço máximo</label>
+                <input type="number" step="0.01" class="form-control" id="max_price" name="max_price" value="{{ max_price or '' }}" placeholder="Ex: 50.00">
+            </div>
+            <div class="col-md-3">
+                <label for="sort" class="form-label">Ordenar por</label>
+                <select name="sort" id="sort" class="form-select">
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Nome</option>
+                    <option value="price_asc" {% if sort_by == 'price_asc' %}selected{% endif %}>Preço (menor → maior)</option>
+                    <option value="price_desc" {% if sort_by == 'price_desc' %}selected{% endif %}>Preço (maior → menor)</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Disponíveis</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="available" name="available" value="true" {% if available_only %}checked{% endif %}>
+                    <label class="form-check-label" for="available">Mostrar apenas disponíveis</label>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Favoritos</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="favorites" name="favorites" value="true" {% if favorites_only %}checked{% endif %}>
+                    <label class="form-check-label" for="favorites">Mostrar apenas favoritos</label>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Próximos a mim</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="nearby" name="nearby" value="true" {% if nearby %}checked{% endif %}>
+                    <label class="form-check-label" for="nearby">Filtrar por proximidade</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="radius_km" class="form-label">Raio (km)</label>
+                <input type="number" min="0.5" step="0.5" class="form-control" id="radius_km" name="radius_km" value="{{ radius_km or 3 }}">
+            </div>
+            <div class="col-md-3 d-grid">
+                <button type="submit" class="btn btn-danger"><i class="fas fa-filter"></i> Aplicar filtros</button>
+            </div>
+            <div class="col-md-3 d-grid">
+                <button type="button" id="use-location" class="btn btn-outline-secondary">
+                    <i class="fas fa-location-crosshairs"></i> Usar minha localização
+                </button>
+            </div>
+            <div class="col-12">
+                <small id="current-location" class="text-muted"></small>
+            </div>
+        </form>
+    </div>
+ </div>
+
+{% if items %}
+<div class="row">
+    {% for entry in items %}
+    {% set item = entry.item %}
+    {% set restaurant = entry.restaurant %}
+    {% set distance_km = entry.distance_km %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <img src="{{ item.image_url or '/static/images/food-placeholder.jpg' }}" class="card-img-top" alt="{{ item.name }}" style="height: 200px; object-fit: cover;">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">{{ item.name }}</h5>
+                <p class="card-text text-muted">{{ item.description }}</p>
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <small class="text-muted">Categoria</small>
+                        <div class="fw-bold">{{ item.category or '-' }}</div>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Preço</small>
+                        <div class="fw-bold text-danger">R$ {{ '%.2f'|format(item.price) }}</div>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Restaurante</small>
+                        <div class="fw-bold">{{ restaurant.name }}</div>
+                    </div>
+                </div>
+                {% if distance_km is not none %}
+                <div class="mb-2">
+                    <span class="badge bg-secondary"><i class="fas fa-location-dot"></i> {{ '%.1f'|format(distance_km) }} km</span>
+                    {% if restaurant.address %}
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ restaurant.address }}" target="_blank" class="ms-2 small">
+                        <i class="fas fa-map"></i> Ver no mapa
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <div class="mt-auto d-flex justify-content-between">
+                    <a href="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-store"></i> Ver restaurante
+                    </a>
+                    <button class="btn btn-outline-secondary favorite-item"
+                            data-item-id="{{ item.id }}"
+                            data-favorited="{{ item.id in user_favorite_item_ids }}">
+                        {% if item.id in user_favorite_item_ids %}
+                        <i class="fas fa-heart text-danger"></i> Favorito
+                        {% else %}
+                        <i class="far fa-heart"></i> Favoritar
+                        {% endif %}
+                    </button>
+                    <form method="POST" action="{{ url_for('add_to_cart', item_id=item.id, quantity=1) }}" class="d-inline">
+                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                        <input type="hidden" name="quantity" value="1">
+                        <button type="submit" class="btn btn-outline-danger add-to-cart"
+                                data-item-id="{{ item.id }}"
+                                data-item-name="{{ item.name }}"
+                                data-item-price="{{ item.price }}"
+                                data-restaurant-id="{{ restaurant.id }}"
+                                data-restaurant-name="{{ restaurant.name }}">
+                            <i class="fas fa-cart-plus"></i> Adicionar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+ </div>
+{% else %}
+<div class="alert alert-info">
+    Nenhum produto encontrado com os filtros aplicados.
+ </div>
+{% endif %}
+
+<style>
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 20px;
+  color: #6c757d;
+  text-decoration: none;
+}
+.category-chip.active {
+  background: #ffecec;
+  border-color: #dc3545;
+  color: #dc3545;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const favButtons = document.querySelectorAll('.favorite-item');
+  favButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const itemId = this.getAttribute('data-item-id');
+      const favorited = this.getAttribute('data-favorited') === 'true';
+      const url = favorited ? `{{ url_for('unfavorite_item', item_id=0) }}`.replace('0', itemId)
+                            : `{{ url_for('favorite_item', item_id=0) }}`.replace('0', itemId);
+      fetch(url, { method: 'POST' })
+        .then(resp => resp.json())
+        .then(data => {
+          if (data.success) {
+            this.setAttribute('data-favorited', favorited ? 'false' : 'true');
+            this.innerHTML = favorited
+              ? '<i class="far fa-heart"></i> Favoritar'
+              : '<i class="fas fa-heart text-danger"></i> Favorito';
+          } else {
+            alert(data.message || 'Não foi possível atualizar favorito');
+          }
+        })
+        .catch(err => alert('Erro ao atualizar favorito'));
+    });
+  });
+
+  const useLocBtn = document.getElementById('use-location');
+  const filtersForm = document.getElementById('filters-form');
+  const currentLocEl = document.getElementById('current-location');
+  const renderCurrentLocation = () => {
+    const ulat = '{{ user_lat or '' }}';
+    const ulon = '{{ user_lon or '' }}';
+    if (ulat && ulon) {
+      fetch(`{{ url_for('api_reverse_geocode') }}?lat=${ulat}&lon=${ulon}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.ok && data.address) {
+            const a = data.address;
+            currentLocEl.textContent = `Localização atual: ${a.street || ''} ${a.number || ''} - ${a.neighborhood || ''}, ${a.city || ''} - ${a.state || ''}`;
+          }
+        })
+        .catch(() => {});
+    }
+  };
+  if (currentLocEl) renderCurrentLocation();
+  if (useLocBtn && filtersForm) {
+    useLocBtn.addEventListener('click', function() {
+      if (!navigator.geolocation) {
+        alert('Seu navegador não suporta geolocalização.');
+        return;
+      }
+      useLocBtn.disabled = true;
+      useLocBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const params = new URLSearchParams(new FormData(filtersForm));
+        params.set('nearby', 'true');
+        params.set('user_lat', String(lat));
+        params.set('user_lon', String(lon));
+        const base = '{{ url_for('list_products') }}';
+        window.location.href = base + '?' + params.toString();
+      }, function(err) {
+        alert('Não foi possível obter sua localização (' + err.message + ').');
+        useLocBtn.disabled = false;
+        useLocBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização';
+      }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+    });
+  }
+
+  const favOnly = document.getElementById('favorites');
+  if (favOnly && filtersForm) {
+    favOnly.addEventListener('change', function() {
+      filtersForm.submit();
+    });
+  }
+});
+</script>
+{% endblock %}

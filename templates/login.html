@@ -11,6 +11,7 @@
                 <p class="text-muted mb-4">Faça login para continuar seu pedido.</p>
                 {% if form is defined %}
                 <form method="POST" action="{{ url_for('login') }}">
+                    <input type="hidden" name="next" value="{{ request.args.get('next') or '' }}">
                     {{ form.hidden_tag() }}
                     <div class="mb-3">
                         {{ form.email.label(class="form-label") }}
@@ -28,30 +29,69 @@
                         <a href="#" class="text-muted small">Esqueceu a senha?</a>
                     </div>
                     <button type="submit" class="btn btn-danger w-100">Entrar</button>
+                    <script>
+                    (function() {
+                        const emailGroup = document.getElementById('emailGroup');
+                        const phoneGroup = document.getElementById('phoneGroup');
+                        const modeEmail = document.getElementById('modeEmail');
+                        const modePhone = document.getElementById('modePhone');
+                        function toggleMode(){
+                            const useEmail = modeEmail.checked;
+                            emailGroup.classList.toggle('d-none', !useEmail);
+                            phoneGroup.classList.toggle('d-none', useEmail);
+                            if (useEmail) {
+                                const p = document.getElementById('phone');
+                                if (p) p.value = '';
+                            } else {
+                                const e = document.getElementById('email');
+                                if (e) e.value = '';
+                            }
+                        }
+                        modeEmail.addEventListener('change', toggleMode);
+                        modePhone.addEventListener('change', toggleMode);
+                        toggleMode();
+                    })();
+                    </script>
                 </form>
                 {% else %}
                 <form method="POST" action="{{ url_for('login') }}">
+                    <input type="hidden" name="next" value="{{ request.args.get('next') or '' }}">
                     <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="email" name="email" placeholder="seu@email.com" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Senha</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Sua senha" required>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="remember_me" name="remember_me">
-                            <label class="form-check-label" for="remember_me">Lembrar-me</label>
+                        <label class="form-label">Entrar como</label>
+                        <div class="btn-group" role="group" aria-label="Tipo de conta">
+                            <input type="radio" class="btn-check" name="role" id="roleCustomer" value="customer" checked>
+                            <label class="btn btn-outline-secondary" for="roleCustomer">Cliente</label>
+                            <input type="radio" class="btn-check" name="role" id="roleRestaurant" value="restaurant">
+                            <label class="btn btn-outline-secondary" for="roleRestaurant">Restaurante</label>
                         </div>
-                        <a href="#" class="text-muted small">Esqueceu a senha?</a>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Usar</label>
+                        <div class="btn-group" role="group" aria-label="Modo de login">
+                            <input type="radio" class="btn-check" name="mode" id="modeEmail" value="email" checked>
+                            <label class="btn btn-outline-primary" for="modeEmail">Email</label>
+                            <input type="radio" class="btn-check" name="mode" id="modePhone" value="phone">
+                            <label class="btn btn-outline-primary" for="modePhone">Telefone</label>
+                        </div>
+                    </div>
+                    <div class="mb-3" id="emailGroup">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="seu@email.com">
+                    </div>
+                    <div class="mb-3 d-none" id="phoneGroup">
+                        <label for="phone" class="form-label">Telefone</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" placeholder="(11) 99999-9999">
+                        <div class="form-text">Usaremos seu telefone cadastrado para enviar o código por SMS/WhatsApp.</div>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        Login sem senha: enviaremos um código de verificação para seu email ou telefone.
                     </div>
                     <button type="submit" class="btn btn-danger w-100">Entrar</button>
                 </form>
                 {% endif %}
 
+                {% if oauth_available %}
                 <div class="divider my-4"><span>ou</span></div>
-
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('google.login') }}" class="btn btn-outline-dark">
                         <i class="fab fa-google me-2"></i> Entrar com Google
@@ -60,6 +100,7 @@
                         <i class="fab fa-facebook me-2"></i> Entrar com Facebook
                     </a>
                 </div>
+                {% endif %}
 
                 <p class="text-center text-muted mt-4">
                     Novo por aqui? Escolha uma opção:

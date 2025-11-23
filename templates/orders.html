@@ -15,7 +15,7 @@
                             <h5 class="mb-0">Pedido #{{ order.id }}</h5>
                             <small class="text-muted">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
                         </div>
-                        <span class="order-status status-{{ order.status }}">{{ order.status }}</span>
+                        <span class="order-status status-{{ order.status }}">{{ order.get_status_display() }}</span>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -41,16 +41,45 @@
                                             <strong>R$ {{ order.total|round(2) }}</strong>
                                         </div>
                                         <div class="d-flex justify-content-between mb-2">
-                                            <span>Endereço:</span>
-                                            <span>{{ order.delivery_address }}</span>
+                                            <span>Entrega:</span>
+                                            <span>{{ order.restaurant.delivery_time }} min (estimado {{ order.get_eta_time().strftime('%H:%M') }})</span>
                                         </div>
-                                        {% if order.status == 'pending' %}
-                                            <div class="d-grid gap-2 mt-3">
-                                                <form action="{{ url_for('cancel_order', order_id=order.id) }}" method="POST">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar Pedido</button>
-                                                </form>
-                                            </div>
+                                        {% if address_by_order.get(order.id) %}
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Rota:</span>
+                                            <a class="text-decoration-none" target="_blank" href="https://www.google.com/maps/dir/?api=1&origin={{ order.restaurant.address }}&destination={{ address_by_order.get(order.id).get_full_address() }}">Ver no mapa</a>
+                                        </div>
                                         {% endif %}
+                                        {% if order.status == 'pending' %}
+                                        <div class="alert alert-secondary mt-2">Pedido recebido. O restaurante irá confirmar e iniciar o preparo.</div>
+                                        {% elif order.status == 'preparing' %}
+                                        <div class="alert alert-warning mt-2">Estamos preparando seu pedido.</div>
+                                        {% elif order.status == 'delivering' %}
+                                        <div class="alert alert-info mt-2">Seu pedido está a caminho.</div>
+                                        {% elif order.status == 'delivered' %}
+                                        <div class="alert alert-success mt-2">Pedido entregue.</div>
+                                        {% elif order.status == 'cancelled' %}
+                                        <div class="alert alert-danger mt-2">Pedido cancelado.</div>
+                                        {% endif %}
+                                        <div class="d-grid gap-2 mt-3">
+                                            <a href="{{ url_for('restaurant', restaurant_id=order.restaurant_id) }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-plus"></i> Adicionar mais itens
+                                            </a>
+                                            <form action="{{ url_for('reorder_order', order_id=order.id) }}" method="POST">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-redo"></i> Comprar novamente</button>
+                                            </form>
+                                            <a href="{{ url_for('checkout') }}" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-credit-card"></i> Ir para pagamento
+                                            </a>
+                                            <a href="{{ url_for('order_invoice', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-file-invoice"></i> Ver Nota Fiscal
+                                            </a>
+                                            {% if order.status == 'pending' %}
+                                            <form action="{{ url_for('cancel_order', order_id=order.id) }}" method="POST">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar Pedido</button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -70,4 +99,76 @@
         {% endif %}
     </div>
 </div>
+
+{% if cart %}
+<div class="row mt-4">
+  <div class="col-md-4 ms-auto">
+    <div class="card">
+      <div class="card-header bg-danger text-white">
+        <h6 class="mb-0">Sua Sacola</h6>
+      </div>
+      <div class="card-body">
+        {% if cart and cart.items %}
+          {% for ci in cart.items %}
+          <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+            <div class="flex-grow-1">
+              <h6 class="mb-1">{{ ci.menu_item.name }}</h6>
+              <p class="text-muted mb-1 small">{{ ci.menu_item.description }}</p>
+              <strong class="text-success">R$ {{ "%.2f"|format(ci.price) }}</strong>
+            </div>
+            <div class="d-flex align-items-center">
+              <div class="btn-group me-3" role="group">
+                <form method="POST" action="{{ url_for('update_cart_item') }}" style="display:inline;">
+                  <input type="hidden" name="item_id" value="{{ ci.id }}">
+                  <input type="hidden" name="quantity" value="{{ ci.quantity - 1 }}">
+                  <button type="submit" class="btn btn-outline-secondary btn-sm" {% if ci.quantity <= 1 %}disabled{% endif %}>
+                    <i class="fas fa-minus"></i>
+                  </button>
+                </form>
+                <span class="btn btn-outline-secondary btn-sm disabled">{{ ci.quantity }}</span>
+                <form method="POST" action="{{ url_for('update_cart_item') }}" style="display:inline;">
+                  <input type="hidden" name="item_id" value="{{ ci.id }}">
+                  <input type="hidden" name="quantity" value="{{ ci.quantity + 1 }}">
+                  <button type="submit" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </form>
+              </div>
+              <div class="text-end me-3">
+                <strong>R$ {{ "%.2f"|format(ci.get_subtotal()) }}</strong>
+              </div>
+              <form method="POST" action="{{ url_for('remove_from_cart') }}" style="display:inline;">
+                <input type="hidden" name="item_id" value="{{ ci.id }}">
+                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remover este item da sacola?')">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="d-flex justify-content-between mb-2">
+            <span>Subtotal ({{ cart.get_item_count() }} {% if cart.get_item_count() == 1 %}item{% else %}itens{% endif %}):</span>
+            <span>R$ {{ "%.2f"|format(cart.get_total()) }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Taxa de entrega:</span>
+            <span>R$ {{ "%.2f"|format(cart.restaurant.delivery_fee) }}</span>
+          </div>
+          <hr>
+          <div class="d-flex justify-content-between">
+            <strong>Total:</strong>
+            <strong>R$ {{ "%.2f"|format(cart.get_total() + cart.restaurant.delivery_fee) }}</strong>
+          </div>
+          <div class="d-grid gap-2 mt-3">
+            <a href="{{ url_for('checkout') }}" class="btn btn-success btn-sm"><i class="fas fa-credit-card"></i> Ir para pagamento</a>
+            <a href="{{ url_for('restaurant', restaurant_id=cart.restaurant_id) }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-plus"></i> Adicionar mais itens</a>
+          </div>
+        {% else %}
+          <div class="text-center text-muted">Sua sacola está vazia.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
