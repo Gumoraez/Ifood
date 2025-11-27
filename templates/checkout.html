@@ -118,6 +118,49 @@
                                     <i class="fas fa-money-bill"></i> Dinheiro na Entrega
                                 </label>
                             </div>
+                            <div id="payment-help" class="form-text mt-2">Selecione o método de pagamento.</div>
+                            <div id="pix-info" class="alert alert-info mt-3 d-none">
+                                <i class="fas fa-qrcode"></i> Para PIX, o QR será exibido abaixo e você pode copiar o código.
+                            </div>
+                            <div id="card-fields" class="mt-3 d-none">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nome impresso no cartão</label>
+                                        <input type="text" class="form-control" name="card_name" id="card_name" placeholder="Nome completo">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Número do cartão</label>
+                                        <input type="text" class="form-control" name="card_number" id="card_number" placeholder="0000 0000 0000 0000" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Validade (MM/AA)</label>
+                                        <input type="text" class="form-control" name="card_expiry" id="card_expiry" placeholder="MM/AA" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">CVV</label>
+                                        <input type="text" class="form-control" name="card_cvv" id="card_cvv" placeholder="CVV" inputmode="numeric">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Documento (CPF/CNPJ)</label>
+                                        <input type="text" class="form-control" name="card_doc" id="card_doc" placeholder="Somente números" inputmode="numeric">
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="pix-section" class="mt-3 d-none">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-4 text-center">
+                                        <img id="pix-qr" alt="QR PIX" class="img-fluid" style="max-height:180px" onerror="this.style.display='none'">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">Código PIX copia e cola</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="pix-code" readonly>
+                                            <button type="button" class="btn btn-outline-secondary" id="pix-copy">Copiar</button>
+                                        </div>
+                                        <div class="small text-muted mt-2" id="pix-amount"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -174,6 +217,48 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('checkout-form');
+    const help = document.getElementById('payment-help');
+    const pixInfo = document.getElementById('pix-info');
+    const radios = document.querySelectorAll('input[name="payment_method"]');
+    const cardFields = document.getElementById('card-fields');
+    const pixSection = document.getElementById('pix-section');
+    const pixQr = document.getElementById('pix-qr');
+    const pixCode = document.getElementById('pix-code');
+    const pixCopy = document.getElementById('pix-copy');
+    const pixAmount = document.getElementById('pix-amount');
+    const totalAmount = {{ (cart.get_total() + cart.restaurant.delivery_fee)|round(2) }};
+    const merchant = `{{ cart.restaurant.name }}`;
+    const updateHelp = () => {
+        const sel = document.querySelector('input[name="payment_method"]:checked')?.value;
+        if (sel === 'credit_card') {
+            help.textContent = 'Pagando com cartão de crédito.';
+            pixInfo.classList.add('d-none');
+            cardFields.classList.remove('d-none');
+            pixSection.classList.add('d-none');
+        } else if (sel === 'debit_card') {
+            help.textContent = 'Pagando com cartão de débito.';
+            pixInfo.classList.add('d-none');
+            cardFields.classList.remove('d-none');
+            pixSection.classList.add('d-none');
+        } else if (sel === 'pix') {
+            help.textContent = 'Pagando com PIX.';
+            pixInfo.classList.remove('d-none');
+            cardFields.classList.add('d-none');
+            pixSection.classList.remove('d-none');
+            const payload = `BRCode|merchant=${merchant}|amount=${Number(totalAmount).toFixed(2)}|ref={{ current_user.id }}`;
+            const qrsrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(payload)}`;
+            pixQr.src = qrsrc;
+            pixCode.value = payload;
+            pixAmount.textContent = `Valor: R$ ${Number(totalAmount).toFixed(2)} para ${merchant}`;
+        } else if (sel === 'cash') {
+            help.textContent = 'Pagando em dinheiro na entrega.';
+            pixInfo.classList.add('d-none');
+            cardFields.classList.add('d-none');
+            pixSection.classList.add('d-none');
+        }
+    };
+    radios.forEach(r => r.addEventListener('change', updateHelp));
+    updateHelp();
     if (form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -190,15 +275,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Por favor, selecione um método de pagamento.');
                 return;
             }
+            if (paymentMethod.value === 'credit_card' || paymentMethod.value === 'debit_card') {
+                const name = document.getElementById('card_name').value.trim();
+                const number = document.getElementById('card_number').value.replace(/\s+/g,'');
+                const expiry = document.getElementById('card_expiry').value.trim();
+                const cvv = document.getElementById('card_cvv').value.trim();
+                if (!name || !number || !expiry || !cvv) {
+                    alert('Informe todos os dados do cartão.');
+                    return;
+                }
+                const luhn = (s) => { let sum=0,alt=false; for(let i=s.length-1;i>=0;i--){ let n=parseInt(s[i],10); if(isNaN(n)) return false; if(alt){ n*=2; if(n>9)n-=9;} sum+=n; alt=!alt;} return sum%10===0; };
+                if (!luhn(number)) { alert('Número do cartão inválido.'); return; }
+                const m = expiry.split('/');
+                if (m.length!==2) { alert('Validade inválida. Use MM/AA.'); return; }
+                const mm = parseInt(m[0],10), aa = parseInt(m[1],10);
+                if (!(mm>=1 && mm<=12)) { alert('Mês de validade inválido.'); return; }
+                const now = new Date();
+                const year = 2000 + aa;
+                const expDate = new Date(year, mm);
+                if (expDate < new Date(now.getFullYear(), now.getMonth()+1)) { alert('Cartão vencido.'); return; }
+                if (!(cvv.length===3 || cvv.length===4) || !/^[0-9]+$/.test(cvv)) { alert('CVV inválido.'); return; }
+            }
             
             // Mostrar loading
+            
             const submitBtn = document.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
             submitBtn.disabled = true;
             
-            // Enviar formulário
             this.submit();
+        });
+    }
+    if (pixCopy && pixCode) {
+        pixCopy.addEventListener('click', function(){
+            pixCode.select();
+            document.execCommand('copy');
         });
     }
 });

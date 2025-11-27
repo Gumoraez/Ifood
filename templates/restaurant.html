@@ -114,14 +114,18 @@
                                         <p class="text-muted mb-2">{{ item.description }}</p>
                                         <div class="d-flex justify-content-between align-items-center">
                                             <h6 class="mb-0 text-danger">R$ {{ item.price|round(2) }}</h6>
-                                            <button class="btn btn-sm btn-outline-danger add-to-cart"
-                                                    data-item-id="{{ item.id }}"
-                                                    data-item-name="{{ item.name }}"
-                                                    data-item-price="{{ item.price }}"
-                                                    data-restaurant-id="{{ restaurant.id }}"
-                                                    data-restaurant-name="{{ restaurant.name }}">
-                                                <i class="fas fa-plus"></i> Adicionar
-                                            </button>
+                                            <form method="POST" action="{{ url_for('add_to_cart', item_id=item.id, quantity=1) }}" class="d-inline">
+                                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                <input type="hidden" name="quantity" value="1">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger add-to-cart"
+                                                        data-item-id="{{ item.id }}"
+                                                        data-item-name="{{ item.name }}"
+                                                        data-item-price="{{ item.price }}"
+                                                        data-restaurant-id="{{ restaurant.id }}"
+                                                        data-restaurant-name="{{ restaurant.name }}">
+                                                    <i class="fas fa-plus"></i> Adicionar
+                                                </button>
+                                            </form>
                                         </div>
                                     </div>
                                     <div class="col-3">
@@ -322,30 +326,3 @@
   });
 </script>
 {% endblock %}
-    const addButtons = document.querySelectorAll('.add-to-cart');
-    addButtons.forEach(btn => {
-      btn.addEventListener('click', function() {
-        const itemId = this.getAttribute('data-item-id');
-        fetch('{{ url_for('add_to_cart') }}', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item_id: itemId, quantity: 1 })
-        })
-        .then(resp => {
-          const ct = resp.headers.get('content-type') || '';
-          if (!ct.includes('application/json')) {
-            window.location.href = '{{ url_for('login') }}?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-            return Promise.reject(new Error('redirect'));
-          }
-          return resp.json();
-        })
-        .then(data => {
-          if (data && data.success) {
-            window.location.href = '{{ url_for('cart') }}';
-          } else if (data) {
-            alert(data.message || 'Não foi possível adicionar ao carrinho');
-          }
-        })
-        .catch(err => { if (!err || err.message !== 'redirect') alert('Erro ao adicionar ao carrinho'); });
-      });
-    });

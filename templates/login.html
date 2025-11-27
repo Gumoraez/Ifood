@@ -93,8 +93,14 @@
                 {% if oauth_available %}
                 <div class="divider my-4"><span>ou</span></div>
                 <div class="d-grid gap-2">
-                    <a href="{{ url_for('google.login') }}" class="btn btn-outline-dark">
-                        <i class="fab fa-google me-2"></i> Entrar com Google
+                    <a href="{{ url_for('google_login', role='customer') }}" class="btn btn-outline-dark">
+                        <i class="fab fa-google me-2"></i> Entrar com Google (Cliente)
+                    </a>
+                    <a href="{{ url_for('google_login', role='restaurant') }}" class="btn btn-outline-dark">
+                        <i class="fab fa-google me-2"></i> Entrar com Google (Restaurante)
+                    </a>
+                    <a href="{{ url_for('google_login', role='customer', force='1') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-user-switch me-2"></i> Entrar com outra conta Google
                     </a>
                     <a href="{{ url_for('facebook.login') }}" class="btn btn-outline-primary">
                         <i class="fab fa-facebook me-2"></i> Entrar com Facebook

@@ -117,6 +117,18 @@ Relacionamentos:
 - `restaurant_favorite`: id, usuario_id, restaurante_id, criado_em; UNIQUE(usuario_id, restaurante_id)
 - `product_favorite`: id, usuario_id, item_menu_id, criado_em; UNIQUE(usuario_id, item_menu_id)
 
+## Tabela `restaurant_geo`
+- id: INTEGER, PK, AUTOINCREMENT
+- restaurant_id: INTEGER, UNIQUE, NOT NULL, FK → restaurant(id)
+- lat: REAL, NOT NULL
+- lon: REAL, NOT NULL
+- criado_em: DATETIME, DEFAULT CURRENT_TIMESTAMP
+- atualizado_em: DATETIME, DEFAULT CURRENT_TIMESTAMP
+- Índices: `idx_restaurant_geo_restaurant (restaurant_id)`
+
+Relacionamentos:
+- Referencia `restaurant(id)`
+
 ## Tabela `oauth`
 - id: INTEGER, PK, AUTOINCREMENT
 - provider: VARCHAR(50), NOT NULL

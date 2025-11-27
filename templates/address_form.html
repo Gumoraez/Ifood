@@ -192,10 +192,21 @@ document.getElementById('zip_code').addEventListener('input', function(e) {
 // Buscar endereço por CEP (simulação - em produção usar API dos Correios)
 document.getElementById('zip_code').addEventListener('blur', function(e) {
     const cep = e.target.value.replace(/\D/g, '');
-    if (cep.length === 8) {
-        // Aqui você pode integrar com a API dos Correios ou ViaCEP
-        console.log('Buscar endereço para CEP:', cep);
-    }
+    if (cep.length !== 8) return;
+    fetch(`${"{{ url_for('api_viacep') }}"}?cep=${cep}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) throw new Error(data.error || 'Falha ao consultar CEP');
+        const a = data.address || {};
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && (val !== undefined && val !== null)) el.value = val; };
+        setVal('street', a.street || '');
+        setVal('neighborhood', a.neighborhood || '');
+        setVal('city', a.city || '');
+        const st = document.getElementById('state'); if (st) st.value = (a.state || '');
+        setVal('zip_code', a.zip_code || e.target.value);
+        setVal('complement', a.complement || '');
+      })
+      .catch(err => alert(err.message || 'Falha ao obter endereço pelo CEP'))
 });
 </script>
 <script>
@@ -204,15 +215,15 @@ document.addEventListener('DOMContentLoaded', function() {
   if (!btn) return;
   btn.addEventListener('click', function() {
     if (!navigator.geolocation) { alert('Seu navegador não suporta geolocalização.'); return; }
+    if (!window.isSecureContext && !['localhost','127.0.0.1'].includes(location.hostname)) { alert('Seu navegador exige conexão segura (HTTPS) para usar geolocalização. Acesse via http://127.0.0.1:5000 ou habilite HTTPS.'); return; }
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
     navigator.geolocation.getCurrentPosition(function(pos) {
       const lat = pos.coords.latitude; const lon = pos.coords.longitude;
       fetch(`{{ url_for('api_reverse_geocode') }}?lat=${lat}&lon=${lon}`)
         .then(r => r.json())
         .then(data => {
-          if (!data.ok) throw new Error(data.error || 'Falha ao obter endereço');
           const a = data.address || {};
-          const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+          const setVal = (id, val) => { const el = document.getElementById(id); if (el && (val !== undefined && val !== null)) el.value = val; };
           setVal('name', document.getElementById('name').value || 'Casa');
           setVal('street', a.street || '');
           setVal('number', a.number || '');
@@ -220,8 +231,16 @@ document.addEventListener('DOMContentLoaded', function() {
           setVal('city', a.city || 'São Paulo');
           const st = document.getElementById('state'); if (st) st.value = (a.state || 'SP');
           setVal('zip_code', a.zip_code || '');
+          if (!data.ok) {
+            alert('Não conseguimos obter seu endereço automaticamente. Preencha os campos manualmente.');
+          }
         })
-        .catch(err => alert(err.message || 'Erro ao usar localização'))
+        .catch(err => {
+          const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+          setVal('city', 'São Paulo');
+          const st = document.getElementById('state'); if (st) st.value = 'SP';
+          alert('Não conseguimos obter seu endereço automaticamente. Preencha os campos manualmente.');
+        })
         .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização'; });
     }, function(err) {
       alert('Não foi possível obter sua localização (' + err.message + ').');

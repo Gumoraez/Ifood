@@ -13,8 +13,10 @@
 
 <div class="card modern-card mb-4">
     <div class="card-body">
-        <form method="GET" action="{{ url_for('list_restaurants') }}" class="row g-3 align-items-end">
+        <form id="restaurants-filter-form" method="GET" action="{{ url_for('list_restaurants') }}" class="row g-3 align-items-end">
             <input type="hidden" name="q" value="{{ q or '' }}">
+            <input type="hidden" name="user_lat" id="user_lat">
+            <input type="hidden" name="user_lon" id="user_lon">
             <div class="col-md-3">
                 <label for="category" class="form-label">Categoria</label>
                 <div class="category-chips mb-3">
@@ -56,6 +58,9 @@
             </div>
             <div class="col-md-1 d-grid">
                 <button type="submit" class="btn btn-danger">Filtrar</button>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="button" id="use-location-restaurants" class="btn btn-outline-secondary"><i class="fas fa-location-crosshairs"></i> Usar minha localização</button>
             </div>
         </form>
         <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
@@ -100,6 +105,7 @@
             {% endif %}
             {% endif %}
             <span class="text-muted">Total: {{ restaurants|length }} restaurantes</span>
+            <small id="current-location-rest" class="text-muted ms-2"></small>
         </div>
     </div>
 </div>
@@ -277,7 +283,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Erro ao processar solicitação');
             });
         });
-    });
+  });
+
+  const currentLocRest = document.getElementById('current-location-rest');
+  const ulatRest = '{{ user_lat or '' }}';
+  const ulonRest = '{{ user_lon or '' }}';
+  const uaccRest = '{{ user_accuracy or '' }}';
+  if (currentLocRest && ulatRest && ulonRest) {
+    fetch(`{{ url_for('api_reverse_geocode') }}?lat=${ulatRest}&lon=${ulonRest}`)
+      .then(r => r.json())
+      .then(data => {
+        const accTxt = uaccRest ? ` (± ${uaccRest} m)` : '';
+        if (data && data.ok && data.address) {
+          const a = data.address;
+          currentLocRest.textContent = `Sua localização: ${a.street || ''} ${a.number || ''} - ${a.neighborhood || ''}, ${a.city || ''} - ${a.state || ''}${accTxt}`;
+        } else {
+          currentLocRest.textContent = `Sua localização: lat ${ulatRest}, lon ${ulonRest}${accTxt}`;
+        }
+      })
+      .catch(() => {
+        const accTxt = uaccRest ? ` (± ${uaccRest} m)` : '';
+        currentLocRest.textContent = `Sua localização: lat ${ulatRest}, lon ${ulonRest}${accTxt}`;
+      });
+  }
+  const useLocBtnR = document.getElementById('use-location-restaurants');
+  const rForm = document.getElementById('restaurants-filter-form');
+  if (useLocBtnR && rForm) {
+    useLocBtnR.addEventListener('click', function() {
+      if (!navigator.geolocation) {
+        alert('Seu navegador não suporta geolocalização.');
+        return;
+      }
+      useLocBtnR.disabled = true;
+      useLocBtnR.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy || null;
+          fetch('{{ url_for('api_set_user_location') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lon, accuracy })
+          }).finally(() => {
+            document.getElementById('nearby').checked = true;
+            document.getElementById('user_lat').value = String(lat);
+            document.getElementById('user_lon').value = String(lon);
+            rForm.submit();
+          });
+        }, function(err) {
+          alert('Não foi possível obter sua localização (' + err.message + ').');
+          useLocBtnR.disabled = false;
+          useLocBtnR.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização';
+        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      });
+    }
 });
 </script>
 {% endblock %}

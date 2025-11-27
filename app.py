@@ -29,6 +29,8 @@ import random
 import string
 from flask_mail import Mail, Message
 import math
+import json
+from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
 
 # Carrega variáveis do .env e permite HTTP em desenvolvimento
 load_dotenv()
@@ -39,6 +41,8 @@ os.environ.setdefault('OAUTHLIB_INSECURE_TRANSPORT', '1')
 app = Flask(__name__)
 # Chave secreta para proteger sessões e CSRF em formulários
 app.config['SECRET_KEY'] = 'food-delivery-secret-key'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
 # Banco de dados SQLite no arquivo food_delivery.db (na raiz do projeto)
 # Dica: se preferir, mude para dentro de instance com: 'sqlite:///instance/food_delivery.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cliente.db'
@@ -77,7 +81,7 @@ app.config['SHOW_DEV_CODE'] = (
     (not os.environ.get('MAIL_USERNAME') and not os.environ.get('SMTP_USER')) or
     (app.config.get('MAIL_USERNAME') in ('seuemail@gmail.com', None, ''))
 )
-app.config['ALLOW_OPEN_ACCESS'] = True
+app.config['ALLOW_OPEN_ACCESS'] = False
 
 verification_codes = {}
 
@@ -152,10 +156,84 @@ def api_reverse_geocode():
         lon = parse_float(request.args.get('lon'))
         data = reverse_geocode(lat, lon)
         if not data:
-            return jsonify({"ok": False, "error": "Não foi possível obter endereço"}), 400
+            data = {"street": "", "number": "", "neighborhood": "", "city": "São Paulo", "state": "SP", "zip_code": ""}
         return jsonify({"ok": True, "address": data})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+@app.route('/api/viacep')
+def api_viacep():
+    try:
+        cep_raw = request.args.get('cep') or ''
+        cep = ''.join(ch for ch in str(cep_raw) if ch.isdigit())
+        if len(cep) != 8:
+            return jsonify({'ok': False, 'error': 'CEP inválido'}), 400
+        url = f'https://viacep.com.br/ws/{cep}/json/'
+        resp = requests.get(url, timeout=8)
+        if resp.status_code != 200:
+            return jsonify({'ok': False, 'error': 'Falha ao consultar CEP'}), 400
+        data = resp.json()
+        if isinstance(data, dict) and data.get('erro'):
+            return jsonify({'ok': False, 'error': 'CEP não encontrado'}), 404
+        address = {
+            'street': (data.get('logradouro') or ''),
+            'number': '',
+            'neighborhood': (data.get('bairro') or ''),
+            'city': (data.get('localidade') or ''),
+            'state': (data.get('uf') or ''),
+            'zip_code': (f"{cep[:5]}-{cep[5:]}" if cep else ''),
+            'complement': (data.get('complemento') or '')
+        }
+        return jsonify({'ok': True, 'address': address})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+@app.route('/api/set-user-location', methods=['POST', 'GET'])
+def api_set_user_location():
+    try:
+        if request.method == 'GET':
+            src = request.args
+        else:
+            data = request.get_json(silent=True)
+            if isinstance(data, dict) and data:
+                src = data
+            else:
+                src = request.form or {}
+                if not src:
+                    raw_text = request.get_data(as_text=True) or ''
+                    try:
+                        maybe = json.loads(raw_text)
+                        if isinstance(maybe, dict):
+                            src = maybe
+                    except Exception:
+                        pass
+                    if not src and raw_text:
+                        try:
+                            pairs = dict(part.split('=') for part in raw_text.split('&') if '=' in part)
+                            src = pairs
+                        except Exception:
+                            src = {}
+        def pick(*keys):
+            for k in keys:
+                v = src.get(k)
+                if v is not None:
+                    return v
+            return None
+        lat_raw = pick('lat', 'latitude', 'user_lat')
+        lon_raw = pick('lon', 'longitude', 'user_lon')
+        acc_raw = pick('accuracy', 'user_accuracy', 'acc')
+        lat = parse_float(lat_raw)
+        lon = parse_float(lon_raw)
+        if lat is None or lon is None:
+            return jsonify({'ok': False, 'error': 'Coordenadas inválidas'}), 400
+        session['user_lat'] = lat
+        session['user_lon'] = lon
+        acc = parse_float(acc_raw)
+        if acc is not None:
+            session['user_accuracy'] = acc
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Distância aproximada (km) entre dois pontos geográficos."""
@@ -201,6 +279,27 @@ def validate_payment(method: str, total: float) -> bool:
         pass
     return False
 
+def get_restaurant_coords(restaurant):
+    try:
+        if not restaurant or not restaurant.address:
+            return None
+        rec = RestaurantGeo.query.filter_by(restaurant_id=restaurant.id).first()
+        if rec:
+            return (rec.lat, rec.lon)
+        coords = geocode_address(restaurant.address)
+        if coords:
+            lat, lon = coords
+            try:
+                rec = RestaurantGeo(restaurant_id=restaurant.id, lat=lat, lon=lon)
+                db.session.add(rec)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            return coords
+    except Exception:
+        pass
+    return None
+
 # Configuração dos blueprints OAuth
 if OAUTH_AVAILABLE:
     google_bp = make_google_blueprint(
@@ -209,6 +308,10 @@ if OAUTH_AVAILABLE:
         scope=["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile", "openid"],
         redirect_to="google_login"
     )
+    try:
+        google_bp.authorization_url_params = {"prompt": "consent select_account", "access_type": "offline", "include_granted_scopes": "true"}
+    except Exception:
+        pass
     facebook_bp = make_facebook_blueprint(
         client_id=app.config['FACEBOOK_OAUTH_CLIENT_ID'],
         client_secret=app.config['FACEBOOK_OAUTH_CLIENT_SECRET'],
@@ -344,6 +447,17 @@ class CartItem(db.Model):
     
     def __repr__(self):
         return f'<CartItem {self.menu_item.name} x{self.quantity}>'
+
+class RestaurantGeo(db.Model):
+    __bind_key__ = 'restaurants'
+    __tablename__ = 'restaurant_geo'
+    id = db.Column(db.Integer, primary_key=True)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), unique=True, nullable=False)
+    lat = db.Column(db.Float, nullable=False)
+    lon = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    restaurant = db.relationship('Restaurant', backref=db.backref('geo_record', uselist=False))
 
 # Order: pedido com status, total e endereço; criado em created_at e possui itens (OrderItem)
 class UserAddress(db.Model):
@@ -579,7 +693,10 @@ def send_email_code(to_email, code):
     password = os.environ.get('SMTP_PASS') or os.environ.get('SMTP_PASSWORD') or app.config.get('MAIL_PASSWORD')
     if password:
         try:
-            password = ''.join(str(password).split())
+            p = str(password)
+            p = p.replace('-', '')
+            p = ''.join(p.split())
+            password = p
         except Exception:
             pass
     from_email = os.environ.get('SMTP_FROM') or os.environ.get('MAIL_FROM') or app.config.get('MAIL_DEFAULT_SENDER') or user
@@ -707,24 +824,51 @@ def debug_send_email():
 @app.route('/enviar_codigo', methods=['POST'])
 def enviar_codigo():
     data = request.get_json(silent=True) or {}
-    email = data.get('email')
+    email = (data.get('email') or '').strip().lower()
+    role = (data.get('role') or 'customer').strip().lower()
+    is_restaurant = True if role == 'restaurant' else False
     if not email:
         return jsonify({'status': 'Informe email'}), 400
+    user = User.query.filter_by(email=email, is_restaurant=is_restaurant).first()
+    if not user:
+        new_user = User(name=(email.split('@')[0] or 'Usuário'), email=email, is_restaurant=is_restaurant, is_verified=False)
+        db.session.add(new_user)
+        db.session.commit()
+        user = new_user
     code = generate_verification_code()
-    verification_codes[email] = code
-    ok = send_email_mailtrap(email, code)
-    return jsonify({'status': 'Código enviado' if ok else 'Falha ao enviar', 'ok': ok, 'code': code})
+    user.verification_code = code
+    user.verification_code_expires = datetime.utcnow() + timedelta(minutes=10)
+    db.session.commit()
+    session['last_verification_code'] = code
+    ok = send_verification_code(email, code, method='email')
+    verify_url = url_for('verify_code', user_id=user.id)
+    return jsonify({'status': 'Código enviado' if ok else 'Falha ao enviar', 'ok': ok, 'code': (code if app.config.get('SHOW_DEV_CODE') else None), 'verify_url': verify_url, 'user_id': user.id})
 
 @app.route('/verificar_codigo', methods=['POST'])
 def verificar_codigo_api():
     data = request.get_json(silent=True) or {}
-    email = data.get('email')
+    email = (data.get('email') or '').strip().lower()
+    user_id_raw = data.get('user_id')
     code = (data.get('code') or '').strip()
-    if not email or not code:
+    if not code or (not email and not user_id_raw):
         return jsonify({'status': 'Dados insuficientes'}), 400
-    ok = verification_codes.get(email) == code
+    user = None
+    if user_id_raw:
+        try:
+            user = User.query.get(int(user_id_raw))
+        except Exception:
+            user = None
+    if not user and email:
+        user = User.query.filter_by(email=email).first()
+    if not user or not user.verification_code or not user.verification_code_expires:
+        return jsonify({'status': 'Código inválido ou usuário não encontrado'}), 400
+    ok = (user.verification_code == code and datetime.utcnow() < user.verification_code_expires)
     if ok:
-        return jsonify({'status': 'Verificado!'})
+        user.verification_code = None
+        user.verification_code_expires = None
+        user.is_verified = True
+        db.session.commit()
+        return jsonify({'status': 'Verificado!', 'user_id': user.id})
     return jsonify({'status': 'Código incorreto!'}), 400
 
 @app.route('/debug/routes')
@@ -748,6 +892,128 @@ def debug_mail_info():
         return jsonify({'ok': True, 'mail': info})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/debug/set-mail', methods=['POST'])
+def debug_set_mail():
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        def pick(*keys, default=None):
+            for k in keys:
+                v = data.get(k)
+                if v is not None and v != '':
+                    return v
+            return default
+        def to_bool(v, default=False):
+            if v is None:
+                return default
+            s = str(v).strip().lower()
+            return s in ('1','true','yes','y','on')
+        server = pick('server','MAIL_SERVER','SMTP_HOST', default=app.config.get('MAIL_SERVER'))
+        port = pick('port','MAIL_PORT','SMTP_PORT', default=app.config.get('MAIL_PORT') or 587)
+        try:
+            port = int(str(port))
+        except Exception:
+            port = 587
+        username = pick('username','MAIL_USERNAME','SMTP_USER', default=app.config.get('MAIL_USERNAME'))
+        password = pick('password','MAIL_PASSWORD','SMTP_PASS','SMTP_PASSWORD', default=app.config.get('MAIL_PASSWORD'))
+        default_sender = pick('default_sender','MAIL_DEFAULT_SENDER','SMTP_FROM','MAIL_FROM', default=username)
+        secure = (pick('secure','SMTP_SECURE', default='').strip().lower())
+        use_ssl = to_bool(pick('use_ssl','MAIL_USE_SSL', default=None)) if pick('use_ssl','MAIL_USE_SSL', default=None) is not None else (secure == 'ssl' or port == 465)
+        use_tls = to_bool(pick('use_tls','MAIL_USE_TLS', default=None)) if pick('use_tls','MAIL_USE_TLS', default=None) is not None else (not use_ssl)
+        app.config['MAIL_SERVER'] = server or 'smtp.gmail.com'
+        app.config['MAIL_PORT'] = port
+        app.config['MAIL_USE_SSL'] = bool(use_ssl)
+        app.config['MAIL_USE_TLS'] = bool(use_tls)
+        app.config['MAIL_USERNAME'] = username
+        app.config['MAIL_PASSWORD'] = password
+        app.config['MAIL_DEFAULT_SENDER'] = default_sender or username
+        try:
+            mail.init_app(app)
+        except Exception:
+            pass
+        info = {
+            'server': app.config.get('MAIL_SERVER'),
+            'port': app.config.get('MAIL_PORT'),
+            'use_tls': app.config.get('MAIL_USE_TLS'),
+            'use_ssl': app.config.get('MAIL_USE_SSL'),
+            'username_set': bool(app.config.get('MAIL_USERNAME')),
+            'default_sender': app.config.get('MAIL_DEFAULT_SENDER'),
+        }
+        return jsonify({'ok': True, 'mail': info})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/debug/set-google-oauth', methods=['POST'])
+def debug_set_google_oauth():
+    try:
+        if not OAUTH_AVAILABLE:
+            return jsonify({'ok': False, 'error': 'OAuth indisponível'}), 400
+        data = request.get_json(silent=True) or request.form or {}
+        cid = (data.get('client_id') or data.get('GOOGLE_OAUTH_CLIENT_ID') or '').strip()
+        csec = (data.get('client_secret') or data.get('GOOGLE_OAUTH_CLIENT_SECRET') or '').strip()
+        if not cid or not csec:
+            return jsonify({'ok': False, 'error': 'Informe client_id e client_secret'}), 400
+        app.config['GOOGLE_OAUTH_CLIENT_ID'] = cid
+        app.config['GOOGLE_OAUTH_CLIENT_SECRET'] = csec
+        try:
+            google_bp.client_id = cid
+            google_bp.client_secret = csec
+        except Exception:
+            pass
+        try:
+            google_bp.authorization_url_params = {"prompt": "select_account"}
+        except Exception:
+            pass
+        try:
+            google_bp.storage = SQLAlchemyStorage(OAuth, db.session, user=current_user, user_required=False)
+        except Exception:
+            pass
+        redirect_uri = None
+        try:
+            redirect_uri = url_for('google.authorized', _external=True)
+        except Exception:
+            redirect_uri = '/login/google/authorized'
+        return jsonify({'ok': True, 'redirect_uri': redirect_uri, 'client_id_set': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+@app.route('/debug/oauth-info')
+def debug_oauth_info():
+    try:
+        info = {
+            'oauth_available': OAUTH_AVAILABLE,
+        }
+        if OAUTH_AVAILABLE:
+            cid = app.config.get('GOOGLE_OAUTH_CLIENT_ID')
+            csec = app.config.get('GOOGLE_OAUTH_CLIENT_SECRET')
+            info['google_client_id_set'] = bool(cid and cid not in ('seu-client-id-aqui', ''))
+            info['google_client_secret_set'] = bool(csec and csec not in ('seu-client-secret-aqui', ''))
+            try:
+                info['google_redirect_uri'] = url_for('google.authorized', _external=True)
+            except Exception:
+                info['google_redirect_uri'] = '/login/google/authorized'
+        return jsonify({'ok': True, 'info': info})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/debug/oauth-reset', methods=['POST'])
+def debug_oauth_reset():
+    try:
+        session.pop('google_oauth_state', None)
+        session.pop('google_oauth_token', None)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.errorhandler(MismatchingStateError)
+def handle_oauth_state_mismatch(e):
+    try:
+        session.pop('google_oauth_state', None)
+        session.pop('google_oauth_token', None)
+    except Exception:
+        pass
+    flash('Sessão OAuth inválida ou expirada. Por favor, tente novamente.', 'warning')
+    return redirect(url_for('google_login'))
 
 @app.route('/debug/show-code/<int:user_id>')
 def debug_show_code(user_id):
@@ -810,10 +1076,11 @@ def login():
             return redirect(url_for('login'))
 
         if not user:
-            tipo_texto = 'restaurante' if is_restaurant else 'cliente'
-            campo_texto = 'email' if mode == 'email' else 'telefone'
-            flash(f'Nenhuma conta de {tipo_texto} encontrada com esse {campo_texto}.')
-            return redirect(url_for('login'))
+            name_value = (email.split('@')[0] if (mode == 'email' and email) else phone)
+            new_user = User(name=name_value or 'Usuário', email=(email if mode == 'email' else None), phone=(phone if mode == 'phone' else None), is_restaurant=is_restaurant, is_verified=False)
+            db.session.add(new_user)
+            db.session.commit()
+            user = new_user
 
         if app.config.get('ALLOW_OPEN_ACCESS'):
             user.is_verified = True
@@ -866,6 +1133,9 @@ def verify_code(user_id):
             
             login_user(user)
             flash('Login realizado com sucesso!')
+            next_url = session.pop('post_login_next', None)
+            if next_url and next_url.startswith('/') and '//' not in next_url:
+                return redirect(next_url)
             if next_route:
                 try:
                     return redirect(url_for(next_route))
@@ -912,6 +1182,16 @@ def resend_code(user_id):
 @app.route('/logout')
 @login_required
 def logout():
+    try:
+        if OAUTH_AVAILABLE:
+            try:
+                google_bp.storage.set(None)
+            except Exception:
+                pass
+        session.pop('google_oauth_token', None)
+        session.pop('google_oauth_state', None)
+    except Exception:
+        pass
     logout_user()
     return redirect(url_for('index'))
 
@@ -941,7 +1221,7 @@ def register_restaurant():
 
     return render_template('restaurant_register.html', oauth_available=OAUTH_AVAILABLE)
 
-@app.route('/login/google')
+@app.route('/login/google/start')
 def google_login():
     if not OAUTH_AVAILABLE:
         flash('Login social não está disponível nesta instalação.', 'warning')
@@ -959,15 +1239,35 @@ def google_login():
             pass
         return redirect(url_for('login'))
 
+    role = (request.args.get('role') or '').strip().lower()
+    desired_is_restaurant = True if role == 'restaurant' else False
     # Verificar se o usuário está autorizado
+    if request.args.get('force') == '1':
+        try:
+            google_bp.storage.set(None)
+        except Exception:
+            session.pop('google_oauth_token', None)
+        try:
+            session.pop('google_oauth_state', None)
+        except Exception:
+            pass
+        try:
+            google_bp.authorization_url_params = {"prompt": "consent select_account", "access_type": "offline", "include_granted_scopes": "true"}
+        except Exception:
+            pass
+        session['oauth_role_is_restaurant'] = desired_is_restaurant
+        return redirect(url_for('google.login'))
     if not google.authorized:
+        # Guardar intenção de perfil antes de iniciar OAuth
+        session['oauth_role_is_restaurant'] = desired_is_restaurant
         return redirect(url_for('google.login'))
     
     try:
-        # Tentar obter informações do usuário
         resp = google.get('/oauth2/v2/userinfo')
         if not resp.ok:
-            flash(f'Erro ao obter dados do Google. Status: {resp.status_code}', 'danger')
+            if getattr(resp, 'status_code', None) == 401:
+                return redirect(url_for('google.login'))
+            flash(f'Erro ao obter dados do Google. Status: {getattr(resp, "status_code", "?")}', 'danger')
             return redirect(url_for('login'))
             
         user_info = resp.json()
@@ -984,44 +1284,43 @@ def google_login():
         user = User.query.filter_by(email=email).first()
         
         if not user:
-            # Criar novo usuário como restaurante
             user = User(
                 name=name,
                 email=email,
                 social_id=user_info.get('id'),
                 social_provider='google',
-                password=None,  # Sem senha para login social
-                is_restaurant=True,
-                is_verified=True  # Contas do Google são consideradas verificadas
+                password=None,
+                is_restaurant=session.get('oauth_role_is_restaurant', desired_is_restaurant),
+                is_verified=False
             )
             db.session.add(user)
             db.session.commit()
-            flash('Conta criada com sucesso usando Google!', 'success')
+            flash('Conta criada com sucesso usando Google. Enviamos um código para confirmar.', 'success')
         else:
             # Atualizar informações sociais se necessário
             if not user.social_id:
                 user.social_id = user_info.get('id')
                 user.social_provider = 'google'
-                user.is_verified = True
                 db.session.commit()
-            
-            # Bloquear login social para contas que não são restaurante
-            if not user.is_restaurant:
-                flash('Login social é exclusivo para contas de restaurante.', 'warning')
-                return redirect(url_for('login'))
         
-        # Fazer login do usuário
-        login_user(user)
+        # Gerar e enviar código de verificação para o email do Google
+        verification_code = generate_verification_code()
+        user.verification_code = verification_code
+        user.verification_code_expires = datetime.utcnow() + timedelta(minutes=10)
+        db.session.commit()
+        session['last_verification_code'] = verification_code
+        ok = send_verification_code(email, verification_code, method='email')
+        if not ok:
+            app.config['SHOW_DEV_CODE'] = True
+            flash('Não foi possível enviar o email com o código. Exibimos o código na tela para você entrar.', 'warning')
+        else:
+            flash('Código de verificação enviado para seu email Google. Confira e digite o código para entrar.')
         
-        # Redirecionar automaticamente para criar restaurante se não houver um cadastrado
-        if user.is_restaurant:
-            has_restaurant = Restaurant.query.filter_by(owner_id=user.id).first()
-            if not has_restaurant:
-                flash('Login com Google realizado! Agora cadastre seu restaurante.', 'info')
-                return redirect(url_for('create_restaurant'))
-        
-        flash('Login com Google realizado com sucesso!', 'success')
-        return redirect(url_for('index'))
+        # Redirecionar para verificação de código
+        next_url = request.args.get('next')
+        if next_url and next_url.startswith('/') and '//' not in next_url:
+            session['post_login_next'] = next_url
+        return redirect(url_for('verify_code', user_id=user.id))
         
     except Exception as e:
         # Log do erro para debug
@@ -1029,7 +1328,28 @@ def google_login():
         flash('Ocorreu um erro durante o login com Google. Tente novamente.', 'danger')
         return redirect(url_for('login'))
 
-@app.route('/login/facebook')
+@app.route('/login/google/choose')
+def google_choose_account():
+    if not OAUTH_AVAILABLE:
+        return redirect(url_for('login'))
+    role = (request.args.get('role') or '').strip().lower()
+    desired_is_restaurant = True if role == 'restaurant' else False
+    session['oauth_role_is_restaurant'] = desired_is_restaurant
+    try:
+        google_bp.storage.set(None)
+    except Exception:
+        session.pop('google_oauth_token', None)
+    try:
+        session.pop('google_oauth_state', None)
+    except Exception:
+        pass
+    try:
+        google_bp.authorization_url_params = {"prompt": "consent select_account", "access_type": "offline", "include_granted_scopes": "true"}
+    except Exception:
+        pass
+    return redirect(url_for('google.login'))
+
+@app.route('/login/facebook/start')
 def facebook_login():
     if not OAUTH_AVAILABLE:
         flash('Login social não está disponível nesta instalação.', 'warning')
@@ -1048,48 +1368,47 @@ def facebook_login():
         return redirect(url_for('login'))
     if not facebook.authorized:
         return redirect(url_for('facebook.login'))
-    
     resp = facebook.get('/me?fields=id,name,email')
     if resp.ok:
         user_info = resp.json()
         email = user_info.get('email')
-        
         if not email:
             flash('Não foi possível obter o email do Facebook.', 'danger')
             return redirect(url_for('login'))
-        
-        # Verificar se o usuário já existe
         user = User.query.filter_by(email=email).first()
-        
         if not user:
-            # Criar novo usuário como restaurante
             user = User(
-                name=user_info['name'],
+                name=user_info.get('name') or (email.split('@')[0]),
                 email=email,
-                social_id=user_info['id'],
+                social_id=user_info.get('id'),
                 social_provider='facebook',
-                password=None,  # Sem senha para login social
-                is_restaurant=True
+                password=None,
+                is_restaurant=True,
+                is_verified=False
             )
             db.session.add(user)
             db.session.commit()
+            flash('Conta criada com sucesso usando Facebook. Enviamos um código para confirmar.', 'success')
         else:
-            # Bloquear login social para contas que não são restaurante
-            if not user.is_restaurant:
-                flash('Login social é exclusivo para contas de restaurante.', 'warning')
-                return redirect(url_for('login'))
-        
-        login_user(user)
-        
-        # Redirecionar automaticamente para criar restaurante se não houver um cadastrado
-        if user.is_restaurant:
-            has_restaurant = Restaurant.query.filter_by(owner_id=user.id).first()
-            if not has_restaurant:
-                flash('Login com Facebook realizado! Agora cadastre seu restaurante.', 'info')
-                return redirect(url_for('create_restaurant'))
-        
-        flash('Login com Facebook realizado com sucesso!', 'success')
-        return redirect(url_for('index'))
+            if not user.social_id:
+                user.social_id = user_info.get('id')
+                user.social_provider = 'facebook'
+                db.session.commit()
+        verification_code = generate_verification_code()
+        user.verification_code = verification_code
+        user.verification_code_expires = datetime.utcnow() + timedelta(minutes=10)
+        db.session.commit()
+        session['last_verification_code'] = verification_code
+        ok = send_verification_code(email, verification_code, method='email')
+        if not ok:
+            app.config['SHOW_DEV_CODE'] = True
+            flash('Não foi possível enviar o email com o código. Exibimos o código na tela para você entrar.', 'warning')
+        else:
+            flash('Código de verificação enviado para seu email Facebook. Confira e digite o código para entrar.')
+        next_url = request.args.get('next')
+        if next_url and next_url.startswith('/') and '//' not in next_url:
+            session['post_login_next'] = next_url
+        return redirect(url_for('verify_code', user_id=user.id))
     
     try:
         error_text = resp.text if hasattr(resp, 'text') else str(resp)
@@ -1156,7 +1475,19 @@ def restaurant(restaurant_id):
 @login_required
 def cart():
     cart = Cart.query.filter_by(user_id=current_user.id).order_by(Cart.updated_at.desc()).first()
-    return render_template('cart.html', cart=cart)
+    available_items = []
+    if cart:
+        try:
+            available_items = (
+                MenuItem.query
+                .filter_by(restaurant_id=cart.restaurant_id, available=True)
+                .order_by(MenuItem.name.asc())
+                .limit(8)
+                .all()
+            )
+        except Exception:
+            available_items = []
+    return render_template('cart.html', cart=cart, available_items=available_items)
 
 @app.route('/add_to_cart', methods=['POST', 'GET'])
 @login_required
@@ -1308,6 +1639,10 @@ def checkout():
         address_id = request.form.get('address_id')
         payment_method = request.form.get('payment_method')
         notes = request.form.get('notes', '')
+        card_name = (request.form.get('card_name') or '').strip()
+        card_number = (request.form.get('card_number') or '').replace(' ', '')
+        card_expiry = (request.form.get('card_expiry') or '').strip()
+        card_cvv = (request.form.get('card_cvv') or '').strip()
         
         if not address_id:
             flash('Selecione um endereço de entrega!', 'danger')
@@ -1316,6 +1651,10 @@ def checkout():
         if not payment_method:
             flash('Selecione uma forma de pagamento!', 'danger')
             return render_template('checkout.html', cart=cart, addresses=addresses, default_address=default_address)
+        if payment_method in ('credit_card', 'debit_card'):
+            if not card_name or not card_number or not card_expiry or not card_cvv:
+                flash('Informe os dados do cartão.', 'danger')
+                return render_template('checkout.html', cart=cart, addresses=addresses, default_address=default_address)
         
         # Calcular valores
         subtotal = cart.get_total()
@@ -1356,7 +1695,7 @@ def checkout():
         db.session.commit()
         
         flash('Pedido realizado com sucesso!', 'success')
-        return redirect(url_for('orders'))
+        return redirect(url_for('order_invoice', order_id=order.id))
     
     return render_template('checkout.html', cart=cart, addresses=addresses, default_address=default_address)
 
@@ -1559,6 +1898,9 @@ def list_restaurants():
         radius_km = 3.0
     user_lat = parse_float(user_lat_raw)
     user_lon = parse_float(user_lon_raw)
+    if user_lat is not None and user_lon is not None:
+        session['user_lat'] = user_lat
+        session['user_lon'] = user_lon
 
     query = Restaurant.query
     
@@ -1605,19 +1947,24 @@ def list_restaurants():
     restaurants = query.all()
 
     # Aplica filtro "Próximos a mim" usando geocodificação do endereço padrão do usuário
-    if nearby_flag and current_user.is_authenticated:
-        default_address = UserAddress.query.filter_by(user_id=current_user.id, is_default=True).first()
-        if not default_address:
-            default_address = UserAddress.query.filter_by(user_id=current_user.id).first()
+    if nearby_flag:
         user_coords = None
-        if default_address:
-            full_addr = f"{default_address.street}, {default_address.number} - {default_address.neighborhood}, {default_address.city} - {default_address.state}, {default_address.zip_code}, Brasil"
-            user_coords = geocode_address(full_addr)
+        if user_lat is not None and user_lon is not None:
+            user_coords = (user_lat, user_lon)
+        elif session.get('user_lat') is not None and session.get('user_lon') is not None:
+            user_coords = (session.get('user_lat'), session.get('user_lon'))
+        elif current_user.is_authenticated:
+            default_address = UserAddress.query.filter_by(user_id=current_user.id, is_default=True).first()
+            if not default_address:
+                default_address = UserAddress.query.filter_by(user_id=current_user.id).first()
+            if default_address:
+                full_addr = f"{default_address.street}, {default_address.number} - {default_address.neighborhood}, {default_address.city} - {default_address.state}, {default_address.zip_code}, Brasil"
+                user_coords = geocode_address(full_addr)
         if user_coords:
             u_lat, u_lon = user_coords
             nearby_list = []
             for r in restaurants:
-                r_coords = geocode_address(r.address)
+                r_coords = get_restaurant_coords(r)
                 if not r_coords:
                     continue
                 r_lat, r_lon = r_coords
@@ -1636,6 +1983,8 @@ def list_restaurants():
     
     categories = [row[0] for row in db.session.query(Restaurant.category).distinct().order_by(Restaurant.category).all()]
 
+    tmpl_user_lat = user_lat_raw or (str(session.get('user_lat')) if session.get('user_lat') is not None else '')
+    tmpl_user_lon = user_lon_raw or (str(session.get('user_lon')) if session.get('user_lon') is not None else '')
     return render_template(
         'restaurants.html',
         restaurants=restaurants,
@@ -1650,7 +1999,10 @@ def list_restaurants():
         sort_by=sort_by,
         nearby=nearby_flag,
         radius_km=radius_km,
-        user_favorites=user_favorites
+        user_favorites=user_favorites,
+        user_lat=tmpl_user_lat,
+        user_lon=tmpl_user_lon,
+        user_accuracy=str(session.get('user_accuracy') or '')
     )
 
 @app.route('/restaurants/new', methods=['GET', 'POST'])
@@ -2042,7 +2394,7 @@ def set_default_address(address_id):
 @app.route('/users')
 @login_required
 def list_users():
-    if not current_user.is_restaurant:  # Apenas administradores podem ver todos os usuários
+    if not current_user.is_admin:
         return redirect(url_for('index'))
     users = User.query.all()
     return render_template('users.html', users=users)
@@ -2050,7 +2402,7 @@ def list_users():
 @app.route('/users/<int:user_id>')
 @login_required
 def view_user(user_id):
-    if current_user.id != user_id and not current_user.is_restaurant:
+    if current_user.id != user_id and not current_user.is_admin:
         return redirect(url_for('index'))
     user = User.query.get_or_404(user_id)
     return render_template('user_detail.html', user=user)
@@ -2058,7 +2410,7 @@ def view_user(user_id):
 @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def edit_user(user_id):
-    if current_user.id != user_id and not current_user.is_restaurant:
+    if current_user.id != user_id and not current_user.is_admin:
         return redirect(url_for('index'))
     
     user = User.query.get_or_404(user_id)
@@ -2081,7 +2433,7 @@ def edit_user(user_id):
 @app.route('/users/delete/<int:user_id>', methods=['POST'])
 @login_required
 def delete_user(user_id):
-    if current_user.id != user_id and not current_user.is_restaurant:
+    if current_user.id != user_id and not current_user.is_admin:
         return redirect(url_for('index'))
 
     user = User.query.get_or_404(user_id)
@@ -2204,7 +2556,8 @@ with app.app_context():
             Restaurant.__table__, MenuItem.__table__,
             Cart.__table__, CartItem.__table__,
             Order.__table__, OrderItem.__table__,
-            RestaurantFavorite.__table__, ProductFavorite.__table__
+            RestaurantFavorite.__table__, ProductFavorite.__table__,
+            RestaurantGeo.__table__
         ]
         db.Model.metadata.create_all(bind=rest_engine, tables=rest_tables)
     except Exception:
@@ -2234,7 +2587,7 @@ with app.app_context():
                 logo=None,
                 address='Rua Pizza, 456',
                 phone='(11) 88888-8888',
-                image_url='https://via.placeholder.com/600x300'
+                image_url='/static/images/restaurant-bg.jpg'
             )
             db.session.add(demo_restaurant)
             db.session.commit()
@@ -2244,7 +2597,7 @@ with app.app_context():
                 name='Pizza Margherita',
                 description='Clássica com tomate, mozzarella e manjericão',
                 price=39.90,
-                image_url='https://via.placeholder.com/300',
+                image_url='/static/images/food-placeholder.jpg',
                 category='Pizza',
                 available=True
             )
@@ -2265,7 +2618,8 @@ with app.app_context():
                 Restaurant.__table__, MenuItem.__table__,
                 Cart.__table__, CartItem.__table__,
                 Order.__table__, OrderItem.__table__,
-                RestaurantFavorite.__table__, ProductFavorite.__table__
+                RestaurantFavorite.__table__, ProductFavorite.__table__,
+                RestaurantGeo.__table__
             ]
             db.Model.metadata.create_all(bind=rest_engine, tables=rest_tables)
         except Exception:
@@ -2297,6 +2651,9 @@ def list_products():
         radius_km = 3.0
     user_lat = parse_float(user_lat_raw)
     user_lon = parse_float(user_lon_raw)
+    if user_lat is not None and user_lon is not None:
+        session['user_lat'] = user_lat
+        session['user_lon'] = user_lon
 
     # Query base: join com restaurante para permitir busca por nome do restaurante
     query = db.session.query(MenuItem, Restaurant).join(Restaurant, MenuItem.restaurant_id == Restaurant.id)
@@ -2385,6 +2742,8 @@ def list_products():
     if nearby_flag:
         if user_lat is not None and user_lon is not None:
             user_coords = (user_lat, user_lon)
+        elif session.get('user_lat') is not None and session.get('user_lon') is not None:
+            user_coords = (session.get('user_lat'), session.get('user_lon'))
         elif current_user.is_authenticated:
             default_address = UserAddress.query.filter_by(user_id=current_user.id, is_default=True).first()
             if not default_address:
@@ -2396,7 +2755,7 @@ def list_products():
     for item, restaurant in results:
         distance_km = None
         if user_coords and restaurant.address:
-            r_coords = geocode_address(restaurant.address)
+            r_coords = get_restaurant_coords(restaurant)
             if r_coords:
                 distance_km = haversine_km(user_coords[0], user_coords[1], r_coords[0], r_coords[1])
         # Se proximidade está ativada, filtra pelo raio
@@ -2412,6 +2771,8 @@ def list_products():
     # Categorias distintas para chips/filtros
     item_categories = [row[0] for row in db.session.query(MenuItem.category).distinct().order_by(MenuItem.category).all() if row[0]]
 
+    tmpl_user_lat = user_lat_raw or (str(session.get('user_lat')) if session.get('user_lat') is not None else '')
+    tmpl_user_lon = user_lon_raw or (str(session.get('user_lon')) if session.get('user_lon') is not None else '')
     return render_template(
         'products.html',
         items=items_data,
@@ -2426,8 +2787,9 @@ def list_products():
         radius_km=radius_km,
         favorites_only=favorites_only,
         user_favorite_item_ids=user_favorite_item_ids,
-        user_lat=user_lat_raw,
-        user_lon=user_lon_raw
+        user_lat=tmpl_user_lat,
+        user_lon=tmpl_user_lon,
+        user_accuracy=str(session.get('user_accuracy') or '')
     )
 
 @app.route('/products/<int:item_id>/favorite', methods=['POST'])
@@ -2484,6 +2846,29 @@ def debug_db_info():
         'order_items': OrderItem.query.count()
     }
     return jsonify({'ok': True, 'uri': uri, 'db_users_path': users_db_path, 'db_restaurants_path': restaurants_db_path, 'counts': counts})
+
+@app.route('/debug/backfill-restaurant-geo', methods=['POST'])
+@app.route('/debug/backfill_restaurant_geo', methods=['POST'])
+def debug_backfill_restaurant_geo():
+    try:
+        updated = 0
+        for r in Restaurant.query.all():
+            if not r.address:
+                continue
+            rec = RestaurantGeo.query.filter_by(restaurant_id=r.id).first()
+            if rec:
+                continue
+            coords = geocode_address(r.address)
+            if not coords:
+                continue
+            lat, lon = coords
+            db.session.add(RestaurantGeo(restaurant_id=r.id, lat=lat, lon=lon))
+            updated += 1
+        db.session.commit()
+        return jsonify({'ok': True, 'updated': updated})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': str(e)})
 
 @app.route('/api/db-counts')
 def api_db_counts():
@@ -2550,7 +2935,7 @@ def debug_seed_demo():
             logo=None,
             address='Rua Pizza, 456',
             phone='(11) 88888-8888',
-            image_url='https://via.placeholder.com/600x300'
+            image_url='/static/images/restaurant-bg.jpg'
         )
         db.session.add(demo_restaurant)
         db.session.commit()
@@ -2560,7 +2945,7 @@ def debug_seed_demo():
             name='Pizza Margherita',
             description='Clássica com tomate, mozzarella e manjericão',
             price=39.90,
-            image_url='https://via.placeholder.com/300',
+            image_url='/static/images/food-placeholder.jpg',
             category='Pizza',
             available=True
         )
@@ -2629,7 +3014,7 @@ def debug_seed_many():
             for j, item_name in enumerate(pick):
                 price = round(20.0 + j*5 + i, 2)
                 mi = MenuItem(restaurant_id=r.id, name=item_name, description=f'{item_name} preparado na hora',
-                              price=price, image_url='https://via.placeholder.com/300', category=cat, available=True)
+                              price=price, image_url='/static/images/food-placeholder.jpg', category=cat, available=True)
                 db.session.add(mi)
             db.session.commit()
         else:
@@ -2662,7 +3047,7 @@ def debug_seed_many():
         exists_item = MenuItem.query.filter_by(name=nm, restaurant_id=target_restaurant_id).first()
         if not exists_item:
             db.session.add(MenuItem(restaurant_id=target_restaurant_id, name=nm, description=f'{nm} feito na hora',
-                                    price=pr, image_url='https://via.placeholder.com/300', category=cat, available=True))
+                                    price=pr, image_url='/static/images/food-placeholder.jpg', category=cat, available=True))
     db.session.commit()
     counts = {
         'users': User.query.count(),
@@ -2701,5 +3086,105 @@ def debug_make_me_restaurant():
         db.session.rollback()
         return jsonify({'ok': False, 'error': str(e)})
 
+@app.route('/debug/fix-images', methods=['POST'])
+def debug_fix_images():
+    try:
+        updated = 0
+        for mi in MenuItem.query.filter(MenuItem.image_url.like('https://via.placeholder.com/%')).all():
+            mi.image_url = '/static/images/food-placeholder.jpg'
+            updated += 1
+        for r in Restaurant.query.filter(Restaurant.image_url.like('https://via.placeholder.com/%')).all():
+            r.image_url = '/static/images/restaurant-bg.jpg'
+            updated += 1
+        db.session.commit()
+        return jsonify({'ok': True, 'updated': updated})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': str(e)})
+
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', 5000)), debug=True, use_reloader=False)
+    ssl_ctx = 'adhoc' if str(os.environ.get('USE_HTTPS_DEV', '')).strip().lower() in ('1','true','yes','on') else None
+    app.run(host='127.0.0.1', port=int(os.environ.get('PORT', 5000)), debug=True, use_reloader=False, ssl_context=ssl_ctx)
+@app.route('/account/disconnect-google', methods=['POST'])
+@login_required
+def disconnect_google():
+    try:
+        if OAUTH_AVAILABLE:
+            try:
+                google_bp.storage.set(None)
+            except Exception:
+                pass
+        session.pop('google_oauth_token', None)
+        session.pop('google_oauth_state', None)
+        user = User.query.get(current_user.id)
+        if user:
+            user.social_id = None
+            user.social_provider = None
+            db.session.commit()
+        flash('Conta Google desvinculada com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao desvincular Google: {str(e)}', 'danger')
+    return redirect(url_for('profile')) if hasattr(current_user, 'id') else redirect(url_for('login'))
+
+@app.route('/account/delete', methods=['POST'])
+@login_required
+def delete_account():
+    try:
+        uid = current_user.id
+        # Remover tokens OAuth
+        try:
+            if OAUTH_AVAILABLE:
+                google_bp.storage.set(None)
+            for tok in OAuth.query.filter_by(user_id=uid).all():
+                db.session.delete(tok)
+        except Exception:
+            pass
+        # Remover favoritos
+        for rf in RestaurantFavorite.query.filter_by(user_id=uid).all():
+            db.session.delete(rf)
+        for pf in ProductFavorite.query.filter_by(user_id=uid).all():
+            db.session.delete(pf)
+        # Remover carrinhos
+        for cart in Cart.query.filter_by(user_id=uid).all():
+            for it in CartItem.query.filter_by(cart_id=cart.id).all():
+                db.session.delete(it)
+            db.session.delete(cart)
+        # Remover pedidos
+        for order in Order.query.filter_by(user_id=uid).all():
+            for it in OrderItem.query.filter_by(order_id=order.id).all():
+                db.session.delete(it)
+            db.session.delete(order)
+        # Remover endereços
+        for addr in UserAddress.query.filter_by(user_id=uid).all():
+            db.session.delete(addr)
+        # Remover restaurantes do usuário
+        for r in Restaurant.query.filter_by(owner_id=uid).all():
+            for mi in MenuItem.query.filter_by(restaurant_id=r.id).all():
+                db.session.delete(mi)
+            # Remover favoritos vinculados ao restaurante
+            for rf in RestaurantFavorite.query.filter_by(restaurant_id=r.id).all():
+                db.session.delete(rf)
+            for ci in Cart.query.filter_by(restaurant_id=r.id).all():
+                for it in CartItem.query.filter_by(cart_id=ci.id).all():
+                    db.session.delete(it)
+                db.session.delete(ci)
+            for od in Order.query.filter_by(restaurant_id=r.id).all():
+                for it in OrderItem.query.filter_by(order_id=od.id).all():
+                    db.session.delete(it)
+                db.session.delete(od)
+            if hasattr(r, 'geo_record') and r.geo_record:
+                db.session.delete(r.geo_record)
+            db.session.delete(r)
+        # Remover usuário
+        user = User.query.get(uid)
+        if user:
+            db.session.delete(user)
+        db.session.commit()
+        logout_user()
+        flash('Sua conta foi excluída com sucesso.', 'success')
+        return redirect(url_for('index'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir conta: {str(e)}', 'danger')
+        return redirect(url_for('profile')) if hasattr(current_user, 'id') else redirect(url_for('login'))

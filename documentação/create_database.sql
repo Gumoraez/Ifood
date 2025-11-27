@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS restaurant (
     FOREIGN KEY (id_dono) REFERENCES user(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS restaurant_geo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER UNIQUE NOT NULL,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (restaurant_id) REFERENCES restaurant(id) ON DELETE CASCADE
+);
+
 -- Tabela de Itens do Menu
 CREATE TABLE IF NOT EXISTS menu_item (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,6 +161,7 @@ CREATE TABLE IF NOT EXISTS oauth (
 CREATE INDEX IF NOT EXISTS idx_user_email ON user(email);
 CREATE INDEX IF NOT EXISTS idx_restaurant_owner ON restaurant(id_dono);
 CREATE INDEX IF NOT EXISTS idx_menu_item_restaurant ON menu_item(restaurante_id);
+CREATE INDEX IF NOT EXISTS idx_restaurant_geo_restaurant ON restaurant_geo(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_order_user ON "order"(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_order_restaurant ON "order"(restaurante_id);
 CREATE INDEX IF NOT EXISTS idx_order_item_order ON order_item(pedido_id);
@@ -172,10 +183,10 @@ INSERT INTO user (nome, email, senha, endereco, telefone, eh_restaurante, eh_adm
 VALUES ('Cliente Exemplo', 'cliente@exemplo.com', 'pbkdf2:sha256:demo', 'Rua Cliente, 456', '(11) 88888-8888', 0, 0, 1);
 
 INSERT INTO restaurant (id_dono, nome, descricao, categoria, taxa_entrega, tempo_entrega, avaliacao, logo, endereco, telefone, url_imagem)
-VALUES (1, 'Pizzaria Demo', 'A melhor pizza da cidade', 'Italiana', 5.99, 30, 4.5, NULL, 'Rua Pizza, 456', '(11) 88888-8888', 'https://via.placeholder.com/600x300');
+VALUES (1, 'Pizzaria Demo', 'A melhor pizza da cidade', 'Italiana', 5.99, 30, 4.5, NULL, 'Rua Pizza, 456', '(11) 88888-8888', '/static/images/restaurant-bg.jpg');
 
 INSERT INTO menu_item (restaurante_id, nome, descricao, preco, url_imagem, categoria, disponivel)
-VALUES (1, 'Pizza Margherita', 'Clássica com tomate, mozzarella e manjericão', 39.90, 'https://via.placeholder.com/300', 'Pizza', 1);
+VALUES (1, 'Pizza Margherita', 'Clássica com tomate, mozzarella e manjericão', 39.90, '/static/images/food-placeholder.jpg', 'Pizza', 1);
 
 INSERT INTO user_address (usuario_id, nome, rua, numero, bairro, cidade, estado, cep, padrao)
 VALUES (2, 'Casa', 'Rua Cliente', '456', 'Centro', 'São Paulo', 'SP', '00000-000', 1);

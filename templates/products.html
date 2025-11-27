@@ -98,7 +98,7 @@
     {% set distance_km = entry.distance_km %}
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100 shadow-sm">
-            <img src="{{ item.image_url or '/static/images/food-placeholder.jpg' }}" class="card-img-top" alt="{{ item.name }}" style="height: 200px; object-fit: cover;">
+            <img src="{{ item.image_url or url_for('static', filename='images/food-placeholder.jpg') }}" class="card-img-top" alt="{{ item.name }}" style="height: 200px; object-fit: cover;" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/food-placeholder.jpg') }}'">
             <div class="card-body d-flex flex-column">
                 <h5 class="card-title">{{ item.name }}</h5>
                 <p class="card-text text-muted">{{ item.description }}</p>
@@ -210,49 +210,63 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  const useLocBtn = document.getElementById('use-location');
-  const filtersForm = document.getElementById('filters-form');
+    const useLocBtn = document.getElementById('use-location');
+    const filtersForm = document.getElementById('filters-form');
   const currentLocEl = document.getElementById('current-location');
   const renderCurrentLocation = () => {
     const ulat = '{{ user_lat or '' }}';
     const ulon = '{{ user_lon or '' }}';
+    const uacc = '{{ user_accuracy or '' }}';
     if (ulat && ulon) {
       fetch(`{{ url_for('api_reverse_geocode') }}?lat=${ulat}&lon=${ulon}`)
         .then(r => r.json())
         .then(data => {
+          const accTxt = uacc ? ` (± ${uacc} m)` : '';
           if (data && data.ok && data.address) {
             const a = data.address;
-            currentLocEl.textContent = `Localização atual: ${a.street || ''} ${a.number || ''} - ${a.neighborhood || ''}, ${a.city || ''} - ${a.state || ''}`;
+            currentLocEl.textContent = `Localização atual: ${a.street || ''} ${a.number || ''} - ${a.neighborhood || ''}, ${a.city || ''} - ${a.state || ''}${accTxt}`;
+          } else {
+            currentLocEl.textContent = `Localização atual: lat ${ulat}, lon ${ulon}${accTxt}`;
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          const accTxt = uacc ? ` (± ${uacc} m)` : '';
+          currentLocEl.textContent = `Localização atual: lat ${ulat}, lon ${ulon}${accTxt}`;
+        });
     }
   };
   if (currentLocEl) renderCurrentLocation();
-  if (useLocBtn && filtersForm) {
-    useLocBtn.addEventListener('click', function() {
-      if (!navigator.geolocation) {
-        alert('Seu navegador não suporta geolocalização.');
-        return;
-      }
-      useLocBtn.disabled = true;
-      useLocBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
-      navigator.geolocation.getCurrentPosition(function(pos) {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        const params = new URLSearchParams(new FormData(filtersForm));
-        params.set('nearby', 'true');
-        params.set('user_lat', String(lat));
-        params.set('user_lon', String(lon));
-        const base = '{{ url_for('list_products') }}';
-        window.location.href = base + '?' + params.toString();
-      }, function(err) {
-        alert('Não foi possível obter sua localização (' + err.message + ').');
-        useLocBtn.disabled = false;
-        useLocBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização';
-      }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
-    });
-  }
+    if (useLocBtn && filtersForm) {
+      useLocBtn.addEventListener('click', function() {
+        if (!navigator.geolocation) {
+          alert('Seu navegador não suporta geolocalização.');
+          return;
+        }
+        useLocBtn.disabled = true;
+        useLocBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy || null;
+          fetch('{{ url_for('api_set_user_location') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lon, accuracy })
+          }).finally(() => {
+            const params = new URLSearchParams(new FormData(filtersForm));
+            params.set('nearby', 'true');
+            params.set('user_lat', String(lat));
+            params.set('user_lon', String(lon));
+            const base = '{{ url_for('list_products') }}';
+            window.location.href = base + '?' + params.toString();
+          });
+        }, function(err) {
+          alert('Não foi possível obter sua localização (' + err.message + ').');
+          useLocBtn.disabled = false;
+          useLocBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i> Usar minha localização';
+        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      });
+    }
 
   const favOnly = document.getElementById('favorites');
   if (favOnly && filtersForm) {

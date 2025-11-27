@@ -14,9 +14,13 @@
                     <p class="text-muted mb-2">
                         Digite o código de 6 dígitos enviado para <strong>{{ user.email }}</strong>
                     </p>
-                    {% if show_dev_code and dev_code %}
-                    <div class="alert alert-warning" role="alert">
-                        Código (desenvolvimento): <strong>{{ dev_code }}</strong>
+                    {% if dev_code %}
+                    <div class="alert alert-warning d-flex justify-content-between align-items-center" role="alert">
+                        <span>Código (desenvolvimento): <strong>{{ dev_code }}</strong></span>
+                        <form method="POST" class="ms-3">
+                            <input type="hidden" name="verification_code" value="{{ dev_code }}" />
+                            <button type="submit" class="btn btn-sm btn-success">Usar código exibido e entrar</button>
+                        </form>
                     </div>
                     {% endif %}
                     
@@ -44,7 +48,7 @@
                     
                     <div class="text-center">
                         <p class="text-muted mb-2">Não recebeu o código?</p>
-                        {% if has_email %}
+                        {% if user.email %}
                         <form method="POST" action="{{ url_for('resend_code', user_id=user.id) }}" class="d-inline">
                             <input type="hidden" name="method" value="email" />
                             <button type="submit" class="btn btn-outline-secondary btn-sm">
@@ -52,7 +56,7 @@
                             </button>
                         </form>
                         {% endif %}
-                        {% if has_phone %}
+                        {% if user.phone %}
                         <form method="POST" action="{{ url_for('resend_code', user_id=user.id) }}" class="d-inline ms-2">
                             <input type="hidden" name="method" value="sms" />
                             <button type="submit" class="btn btn-outline-secondary btn-sm">

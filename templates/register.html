@@ -42,6 +42,8 @@
                     </div>
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-danger">Cadastrar</button>
+                        <a href="{{ url_for('google_login', role='customer') }}" class="btn btn-outline-dark"><i class="fab fa-google me-2"></i> Entrar com Google</a>
+                        <a href="{{ url_for('google_login', role='customer', force='1') }}" class="btn btn-outline-secondary"><i class="fas fa-user-switch me-2"></i> Entrar com outra conta Google</a>
                     </div>
                 </form>
                 

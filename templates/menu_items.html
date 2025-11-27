@@ -20,7 +20,7 @@
         {% for item in menu_items %}
         <div class="col-md-4 mb-4">
             <div class="card h-100">
-                <img src="{{ item.image_url or '/static/images/food-placeholder.jpg' }}" class="card-img-top" alt="{{ item.name }}">
+                <img src="{{ item.image_url or url_for('static', filename='images/food-placeholder.jpg') }}" class="card-img-top" alt="{{ item.name }}" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/food-placeholder.jpg') }}'">
                 <div class="card-body">
                     <h5 class="card-title">{{ item.name }}</h5>
                     <p class="card-text">{{ item.description }}</p>
